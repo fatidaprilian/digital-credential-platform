@@ -1,0 +1,64 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api_service
+    ports:
+      - "3001:3001"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/usr/src/app
+      - api_node_modules:/usr/src/app/node_modules # <-- Perubahan
+    env_file: .env
+    command: npm run start:dev
+
+  client:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: client_service
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - client_node_modules:/app/node_modules # <-- Perubahan
+    env_file: .env
+    command: npm run dev
+
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file: .env
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  hardhat:
+    build:
+      context: ./smart-contract
+      dockerfile: Dockerfile
+    container_name: hardhat_node
+    volumes:
+      - ./smart-contract:/usr/src/app
+      - hardhat_node_modules:/usr/src/app/node_modules # <-- Perubahan
+    env_file: .env
+    command: tail -f /dev/null
+
+volumes:
+  postgres_data:
+  redis_data:
+  api_node_modules: {}      # <-- Deklarasi
+  client_node_modules: {}   # <-- Deklarasi
+  hardhat_node_modules: {}  # <-- Deklarasi

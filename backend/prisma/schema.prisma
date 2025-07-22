@@ -1,0 +1,76 @@
+// backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int          @id @default(autoincrement())
+  walletAddress   String       @unique
+  email           String?
+  name            String?
+  passwordHash    String?  
+  userType        UserType
+  createdAt       DateTime     @default(now())
+  twoFactorSecret String?
+  PaymentLog      PaymentLog[]
+  institutions    Institution[]
+}
+
+enum UserType {
+  holder
+  issuer_admin
+  verifier
+}
+
+model Institution {
+  id          Int                  @id @default(autoincrement())
+  name        String
+  adminUserId Int
+  verifiedAt  DateTime?
+  admin       User                 @relation(fields: [adminUserId], references: [id])
+  templates   CredentialTemplate[]
+}
+
+model CredentialTemplate {
+  id               Int         @id @default(autoincrement())
+  institutionId    Int
+  name             String
+  description      String?
+  ipfsTemplateHash String?
+  dynamicFields    Json?       // <-- TAMBAHKAN BARIS INI
+  institution      Institution @relation(fields: [institutionId], references: [id])
+  issuances        IssuanceLog[]
+}
+
+model IssuanceLog {
+  id               Int                @id @default(autoincrement())
+  credentialId     BigInt // Token ID on-chain
+  templateId       Int
+  recipientAddress String
+  transactionHash  String
+  status           String             @default("confirmed") // misal: "confirmed", "revoked"
+  issuedAt         DateTime           @default(now())
+  template         CredentialTemplate @relation(fields: [templateId], references: [id])
+}
+
+model PaymentLog {
+  id       Int     @id @default(autoincrement())
+  xenditId String  @unique
+  amount   Int
+  status   String // "pending", "success", "failed"
+  userId   Int?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model TransactionLog {
+  id           Int     @id @default(autoincrement())
+  txHash       String  @unique
+  status       String // "pending", "success", "failed"
+  action       String // "mint", "revoke"
+  credentialId BigInt?
+}
