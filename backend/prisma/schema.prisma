@@ -1,4 +1,5 @@
 // backend/prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,69 +9,112 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===================================================================
+//                        MODEL PENGGUNA & INSTITUSI
+// ===================================================================
+
+// Model User lebih fokus pada data otentikasi
 model User {
-  id              Int          @id @default(autoincrement())
-  walletAddress   String       @unique
-  email           String?
-  name            String?
-  passwordHash    String?  
-  userType        UserType
-  createdAt       DateTime     @default(now())
-  twoFactorSecret String?
-  PaymentLog      PaymentLog[]
-  institutions    Institution[]
+  id                   Int           @id @default(autoincrement())
+  email                String        @unique
+  passwordHash         String
+  userType             UserType      // Nilainya akan 'issuer_admin' atau 'platform_admin'
+  createdAt            DateTime      @default(now())
+
+  // Relasi ke institusi yang DIKELOLA oleh user ini
+  // Bisa null jika userType adalah 'platform_admin'
+  institution          Institution?  @relation(fields: [institutionId], references: [id])
+  institutionId        Int?          @unique
+
+  // Tambahan untuk reset password, dll.
+  resetPasswordToken     String?
+  resetPasswordExpires   DateTime?
 }
 
 enum UserType {
-  holder
-  issuer_admin
-  verifier
+  issuer_admin   // Admin dari sebuah institusi
+  platform_admin // Admin dari platform kita yang akan melakukan verifikasi
 }
 
+// Model Institution menyimpan SEMUA data terkait institusi, termasuk status verifikasinya
 model Institution {
-  id          Int                  @id @default(autoincrement())
-  name        String
-  adminUserId Int
-  verifiedAt  DateTime?
-  admin       User                 @relation(fields: [adminUserId], references: [id])
-  templates   CredentialTemplate[]
+  id                        Int               @id @default(autoincrement())
+  name                      String
+  officialEmail             String            @unique
+  phoneNumber               String?
+  address                   String?
+
+  // --- Kolom kunci untuk alur verifikasi ---
+  status                    InstitutionStatus @default(PENDING_EMAIL_VERIFICATION)
+  verificationDocumentUrl   String?           // URL ke dokumen legalitas yang di-upload
+  rejectionReason           String?           // Alasan jika pendaftaran ditolak oleh admin
+  emailVerificationToken    String?           @unique // Token untuk verifikasi email
+  verifiedAt                DateTime?         // Kapan institusi ini diverifikasi oleh admin kita
+
+  // Kredit untuk minting, diisi oleh admin saat approval
+  issuanceCredits           Int               @default(0)
+
+  // Relasi kembali ke User yang menjadi admin institusi ini
+  adminUser                 User?
+
+  // Relasi ke template kredensial yang dimiliki
+  templates                 CredentialTemplate[]
 }
+
+enum InstitutionStatus {
+  PENDING_EMAIL_VERIFICATION // Baru daftar, tunggu klik link email
+  PENDING_ADMIN_VERIFICATION // Email sudah diverifikasi, tunggu admin platform
+  ACTIVE                     // Disetujui admin, bisa login dan menerbitkan
+  REJECTED                   // Ditolak oleh admin
+  SUSPENDED                  // Ditangguhkan karena suatu alasan
+}
+
+
+// ===================================================================
+//                   MODEL KREDENSIAL & LOG TERKAIT
+// ===================================================================
 
 model CredentialTemplate {
-  id               Int         @id @default(autoincrement())
-  institutionId    Int
-  name             String
-  description      String?
-  ipfsTemplateHash String?
-  dynamicFields    Json?       // <-- TAMBAHKAN BARIS INI
-  institution      Institution @relation(fields: [institutionId], references: [id])
-  issuances        IssuanceLog[]
+  id                 Int           @id @default(autoincrement())
+  institutionId      Int
+  name               String
+  description        String?
+  ipfsTemplateHash   String?
+  dynamicFields      Json?         // Untuk mendefinisikan field dinamis (Nama, NIM, dll.)
+  institution        Institution   @relation(fields: [institutionId], references: [id])
+  issuances          IssuanceLog[]
 }
 
 model IssuanceLog {
-  id               Int                @id @default(autoincrement())
-  credentialId     BigInt // Token ID on-chain
-  templateId       Int
-  recipientAddress String
-  transactionHash  String
-  status           String             @default("confirmed") // misal: "confirmed", "revoked"
-  issuedAt         DateTime           @default(now())
-  template         CredentialTemplate @relation(fields: [templateId], references: [id])
-}
-
-model PaymentLog {
-  id       Int     @id @default(autoincrement())
-  xenditId String  @unique
-  amount   Int
-  status   String // "pending", "success", "failed"
-  userId   Int?
-  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                 Int                @id @default(autoincrement())
+  credentialId       BigInt             // Token ID SBT on-chain
+  templateId         Int
+  recipientAddress   String
+  transactionHash    String             @unique
+  status             String             @default("confirmed") // misal: "confirmed", "revoked"
+  issuedAt           DateTime           @default(now())
+  template           CredentialTemplate @relation(fields: [templateId], references: [id])
 }
 
 model TransactionLog {
   id           Int     @id @default(autoincrement())
   txHash       String  @unique
-  status       String // "pending", "success", "failed"
-  action       String // "mint", "revoke"
+  status       String  // "pending", "success", "failed"
+  action       String  // "mint", "revoke"
   credentialId BigInt?
+}
+
+
+// ===================================================================
+//                        MODEL PEMBAYARAN (Opsional)
+// ===================================================================
+
+model PaymentLog {
+  id       Int     @id @default(autoincrement())
+  xenditId String  @unique
+  amount   Int
+  status   String  // "pending", "success", "failed"
+  userId   Int?
+  // Relasi ini perlu disesuaikan, mungkin ke Institution bukan User
+  // user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

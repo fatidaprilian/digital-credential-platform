@@ -16,7 +16,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:3001/auth/signin', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${apiUrl}/auth/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
