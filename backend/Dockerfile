@@ -27,15 +27,10 @@ COPY package*.json ./
 # ====================================================================================
 RUN npm install
 
-# ===================================================================
-#   INI ADALAH PERBAIKAN UTAMA:
-#   Paksa generate Prisma Client setelah instalasi
-# ===================================================================
-RUN npx prisma generate
-
 # Copy sisa kode aplikasi.
 # Dalam setup Anda dengan volume, ini lebih sebagai fallback.
 COPY . .
+RUN npx prisma generate
 
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
