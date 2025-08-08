@@ -1,4 +1,3 @@
-// Path: backend/src/auth/auth.service.ts
 import {
   Injectable,
   ConflictException,
@@ -15,8 +14,8 @@ import { AuthDto } from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import * as path from 'path';
-import { InstitutionStatus, UserType } from '@prisma/client';
+import { InstitutionStatus, User, UserType } from '@prisma/client';
+import { EmailService } from '../email/email.service'; // Impor EmailService
 
 @Injectable()
 export class AuthService {
@@ -24,8 +23,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
+    private emailService: EmailService, // Inject EmailService
   ) {
-    // Ensure uploads directory exists
     this.ensureUploadsDirectory();
   }
 
@@ -41,10 +40,9 @@ export class AuthService {
     dto: InstitutionRegisterDto,
     file: Express.Multer.File,
   ) {
-    // --- TAMBAHKAN BARIS INI UNTUK DEBUGGING ---
-    console.log('--- DEBUG: File object received in service ---');
-    console.log(file);
-    // ---------------------------------------------
+    if (!file) {
+      throw new BadRequestException('Verification document is required.');
+    }
 
     const existingInstitution = await this.prisma.institution.findUnique({
       where: { officialEmail: dto.officialEmail },
@@ -53,44 +51,60 @@ export class AuthService {
       throw new ConflictException('Email institusi sudah terdaftar.');
     }
 
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.officialEmail },
+    });
+    if (existingUser) {
+      throw new ConflictException('Email user sudah terdaftar.');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    
-    // Ambil path file dari objek file yang diunggah
     const verificationDocumentUrl = file.path;
 
     try {
-      const institution = await this.prisma.institution.create({
-        data: {
-          name: dto.name,
-          officialEmail: dto.officialEmail,
-          phoneNumber: dto.phoneNumber,
-          address: dto.address,
-          status: InstitutionStatus.PENDING_EMAIL_VERIFICATION,
-          emailVerificationToken,
-          verificationDocumentUrl, // Simpan path ke database
-          adminUser: {
-            create: {
-              email: dto.officialEmail,
-              passwordHash,
-              userType: UserType.issuer_admin,
-            },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const institution = await tx.institution.create({
+          data: {
+            name: dto.name,
+            officialEmail: dto.officialEmail,
+            phoneNumber: dto.phoneNumber,
+            address: dto.address,
+            status: InstitutionStatus.PENDING_EMAIL_VERIFICATION,
+            emailVerificationToken,
+            verificationDocumentUrl,
           },
-        },
+        });
+
+        const adminUser = await tx.user.create({
+          data: {
+            email: dto.officialEmail,
+            passwordHash,
+            userType: UserType.issuer_admin,
+            institutionId: institution.id,
+          },
+        });
+
+        return { institution, adminUser };
       });
 
       const verificationLink = `${this.config.get(
         'APP_URL',
+        'http://localhost:3000', // Default URL untuk development
       )}/auth/verify-email?token=${emailVerificationToken}`;
-      console.log('--- UNTUK DEVELOPMENT ---');
-      console.log('Link Verifikasi Email:', verificationLink);
+
+      // Mengirim email verifikasi menggunakan EmailService
+      await this.emailService.sendVerificationEmail(dto.officialEmail, dto.name, verificationLink);
 
       return {
         message: 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi.',
-        institutionId: institution.id,
+        institutionId: result.institution.id,
       };
     } catch (error) {
-      console.error(error);
+      console.error('Registration error:', error);
+      if (error.message === 'Gagal mengirim email verifikasi.') {
+        throw new InternalServerErrorException('Akun berhasil dibuat, namun gagal mengirim email verifikasi. Hubungi support.');
+      }
       throw new InternalServerErrorException('Gagal membuat akun institusi.');
     }
   }
@@ -99,14 +113,17 @@ export class AuthService {
     if (!token) {
       throw new BadRequestException('Token verifikasi tidak disediakan.');
     }
+
     const institution = await this.prisma.institution.findUnique({
       where: { emailVerificationToken: token },
     });
+
     if (!institution) {
       throw new NotFoundException(
         'Token verifikasi tidak valid atau sudah kedaluwarsa.',
       );
     }
+
     await this.prisma.institution.update({
       where: { id: institution.id },
       data: {
@@ -114,6 +131,7 @@ export class AuthService {
         emailVerificationToken: null,
       },
     });
+
     return {
       message:
         'Verifikasi email berhasil! Akun Anda sedang dalam peninjauan oleh admin platform.',
@@ -123,7 +141,17 @@ export class AuthService {
   async signin(dto: AuthDto): Promise<{ access_token: string }> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      include: { institution: true },
+      include: {
+        institution: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            issuanceCredits: true,
+            subscriptionExpiresAt: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -139,12 +167,17 @@ export class AuthService {
     }
 
     if (user.userType === UserType.platform_admin) {
-      console.log('Platform admin login successful.');
-      return this.signToken(user.id, user.email, user.userType);
+      return this.signToken(user.id, user.email, user.userType, user.institutionId);
     }
 
     if (user.userType === UserType.issuer_admin) {
-      const institutionStatus = user.institution?.status;
+      if (!user.institution) {
+        throw new UnauthorizedException(
+          'Akun Anda tidak terhubung dengan institusi. Hubungi support.',
+        );
+      }
+
+      const institutionStatus = user.institution.status;
       if (institutionStatus !== InstitutionStatus.ACTIVE) {
         switch (institutionStatus) {
           case InstitutionStatus.PENDING_EMAIL_VERIFICATION:
@@ -167,21 +200,93 @@ export class AuthService {
             );
         }
       }
-      return this.signToken(user.id, user.email, user.userType);
+      return this.signToken(user.id, user.email, user.userType, user.institutionId);
     }
 
     throw new UnauthorizedException('Tipe user tidak valid.');
+  }
+
+  async getProfile(user: User) {
+    const userProfile = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        institution: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            issuanceCredits: true,
+            subscriptionExpiresAt: true,
+            officialEmail: true,
+            phoneNumber: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    if (!userProfile) {
+      throw new UnauthorizedException('Profil pengguna tidak ditemukan.');
+    }
+    
+    if (userProfile.userType === UserType.issuer_admin && !userProfile.institution) {
+      throw new UnauthorizedException(
+        'Akun admin institusi tidak terhubung dengan institusi. Hubungi support.',
+      );
+    }
+    
+    const { passwordHash, ...profile } = userProfile;
+    
+    return profile;
+  }
+
+  async fixExistingUserInstitutionRelation(email: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        include: { institution: true },
+      });
+
+      const institution = await this.prisma.institution.findUnique({
+        where: { officialEmail: email },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User tidak ditemukan.');
+      }
+
+      if (!institution) {
+        throw new NotFoundException('Institusi tidak ditemukan.');
+      }
+
+      if (!user.institutionId) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { institutionId: institution.id },
+        });
+
+        console.log(`Fixed user-institution relation for ${email}: User ${user.id} -> Institution ${institution.id}`);
+        return { message: 'Relasi user-institusi berhasil diperbaiki.' };
+      }
+
+      return { message: 'Relasi sudah benar.' };
+    } catch (error) {
+      console.error('Fix relation error:', error);
+      throw new InternalServerErrorException('Gagal memperbaiki relasi user-institusi.');
+    }
   }
 
   private async signToken(
     userId: number,
     email: string,
     userType: UserType,
+    institutionId: number | null,
   ): Promise<{ access_token: string }> {
     const payload = {
       sub: userId,
       email,
       userType,
+      institutionId,
     };
     const secret = this.config.get('JWT_SECRET');
 

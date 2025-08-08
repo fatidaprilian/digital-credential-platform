@@ -1,3 +1,5 @@
+// Path: backend/src/auth/auth.controller.ts
+
 import {
   Body,
   Controller,
@@ -13,7 +15,7 @@ import {
   FileValidator,
   UseGuards,
   Req,
-  BadRequestException,
+  Res, // <-- 1. Impor 'Res'
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -22,15 +24,17 @@ import { AuthService } from './auth.service';
 import { InstitutionRegisterDto } from './dto/institution-register.dto';
 import { AuthDto } from './dto/auth.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import { Request, Response } from 'express'; // <-- 2. Impor 'Response'
+import { User } from '@prisma/client';
+import { ConfigService } from '@nestjs/config'; // <-- 3. Impor 'ConfigService'
 
-// Custom file type validator
+// Custom file type validator (tetap sama)
 class CustomFileTypeValidator extends FileValidator {
   private allowedMimeTypes = [
     'image/jpeg',
-    'image/jpg', 
+    'image/jpg',
     'image/png',
-    'application/pdf'
+    'application/pdf',
   ];
 
   isValid(file: Express.Multer.File): boolean {
@@ -38,42 +42,42 @@ class CustomFileTypeValidator extends FileValidator {
   }
 
   buildErrorMessage(): string {
-    return `File type not allowed. Allowed types: ${this.allowedMimeTypes.join(', ')}`;
+    return `File type not allowed. Allowed types: ${this.allowedMimeTypes.join(
+      ', ',
+    )}`;
   }
 }
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  // --- 4. Inject ConfigService di Constructor ---
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService, 
+  ) {}
 
-  /**
-   * Endpoint untuk Institusi mendaftarkan akun baru.
-   * Menerima data JSON dan satu file upload untuk dokumen verifikasi.
-   * @param file Dokumen verifikasi (PDF, JPG, PNG, maks 5MB)
-   * @param dto Data pendaftaran institusi (nama, email, password, dll)
-   */
   @Post('register/institution')
   @UseInterceptors(
     FileInterceptor('verificationDocument', {
       storage: diskStorage({
         destination: './uploads/verification-documents',
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const extension = extname(file.originalname);
           cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
         },
       }),
-    })
+    }),
   )
   registerInstitution(
     @UploadedFile(
-      // --- PIPA VALIDASI FILE ---
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5 MB
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new CustomFileTypeValidator({}),
         ],
-        fileIsRequired: true, // Dokumen wajib di-upload
+        fileIsRequired: true,
       }),
     )
     file: Express.Multer.File,
@@ -83,33 +87,39 @@ export class AuthController {
   }
 
   /**
-   * Endpoint yang akan diakses dari link di email verifikasi.
-   * @param token Token yang dikirim ke email
+   * --- PERUBAHAN UTAMA DI SINI ---
+   * Endpoint ini sekarang akan melakukan redirect ke frontend.
    */
   @Get('verify-email')
-  verifyEmail(@Query('token') token: string) {
-    return this.authService.verifyEmail(token);
+  async verifyEmail(
+    @Query('token') token: string,
+    @Res() response: Response, // Dapatkan akses ke objek response
+  ) {
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'http://localhost:3000', // Fallback untuk development
+    );
+    try {
+      await this.authService.verifyEmail(token);
+      // Jika berhasil, arahkan ke halaman sukses di frontend
+      return response.redirect(`${frontendUrl}/auth/verification-success`);
+    } catch (error) {
+      // Jika gagal, arahkan kembali ke halaman registrasi dengan pesan error
+      return response.redirect(
+        `${frontendUrl}/issuer/register?error=verification_failed`,
+      );
+    }
   }
 
-  /**
-   * Endpoint untuk login.
-   * Service akan mengecek status akun sebelum memberikan token.
-   * @param dto Berisi email dan password
-   */
   @HttpCode(HttpStatus.OK)
   @Post('signin')
   signin(@Body() dto: AuthDto) {
     return this.authService.signin(dto);
   }
 
-  /**
-   * Endpoint untuk mendapatkan profil user yang sedang login.
-   * Hanya bisa diakses dengan token JWT yang valid.
-   */
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
   getProfile(@Req() req: Request) {
-    // req.user akan berisi payload dari JWT setelah divalidasi oleh passport
-    return req.user;
+    return this.authService.getProfile(req.user as User);
   }
 }

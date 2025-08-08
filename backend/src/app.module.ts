@@ -16,19 +16,21 @@ import { AuthModule } from './auth/auth.module';
 import { TemplatesModule } from './templates/templates.module';
 import { IpfsModule } from './ipfs/ipfs.module';
 import { AdminModule } from './admin/admin.module';
+import { PaymentsModule } from './payments/payments.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // --- INI BAGIAN PALING PENTING ---
-    // Konfigurasi Multer untuk menyimpan file ke disk, bukan ke memori.
+    // Konfigurasi Multer untuk menyimpan file ke disk.
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads/verification-documents',
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const extension = extname(file.originalname);
           cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
         },
@@ -49,6 +51,8 @@ import { AdminModule } from './admin/admin.module';
     AuthModule,
     TemplatesModule,
     AdminModule,
+    PaymentsModule,
+    EmailModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

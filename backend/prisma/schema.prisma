@@ -1,3 +1,5 @@
+// Path: backend/prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -51,12 +53,14 @@ model Institution {
 
   // Kredit untuk minting, diisi oleh admin saat approval
   issuanceCredits         Int                 @default(0)
+  subscriptionExpiresAt   DateTime?           // Untuk fitur langganan
 
   // Relasi kembali ke User yang menjadi admin institusi ini
   adminUser               User?
 
   // Relasi ke template kredensial yang dimiliki
   templates               CredentialTemplate[]
+  payments                PaymentLog[]        // Relasi ke log pembayaran
 }
 
 enum InstitutionStatus {
@@ -98,13 +102,16 @@ model CredentialTemplate {
 
 model IssuanceLog {
   id               Int                @id @default(autoincrement())
-  credentialId     BigInt             // Token ID SBT on-chain
+  credentialId     BigInt
   templateId       Int
   recipientAddress String
-  transactionHash  String             @unique
-  status           String             @default("confirmed") // misal: "confirmed", "revoked"
+  transactionHash  String
+  status           String             @default("confirmed")
   issuedAt         DateTime           @default(now())
   template         CredentialTemplate @relation(fields: [templateId], references: [id])
+
+  @@unique([transactionHash, credentialId])
+  @@index([credentialId]) // Pastikan baris ini ada untuk optimasi
 }
 
 model TransactionLog {
@@ -117,15 +124,18 @@ model TransactionLog {
 
 
 // ===================================================================
-//                 MODEL PEMBAYARAN (Opsional)
+//                 MODEL PEMBAYARAN
 // ===================================================================
 
 model PaymentLog {
-  id       Int     @id @default(autoincrement())
-  xenditId String  @unique
-  amount   Int
-  status   String  // "pending", "success", "failed"
-  userId   Int?
-  // Relasi ini perlu disesuaikan, mungkin ke Institution bukan User
-  // user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id            Int         @id @default(autoincrement())
+  xenditId      String      @unique
+  amount        Int
+  status        String      // e.g., "PENDING", "PAID", "EXPIRED"
+  description   String?     // Deskripsi dari invoice, misal: "Pembelian 100 kredit"
+  createdAt     DateTime    @default(now())
+  
+  // Relasi ke Institution
+  institutionId Int
+  institution   Institution @relation(fields: [institutionId], references: [id])
 }

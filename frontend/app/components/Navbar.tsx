@@ -96,7 +96,7 @@ export const Navbar = () => {
             <div className="bg-gradient-to-r from-[#00ADB5] to-[#393E46] p-3 rounded-md shadow-md">
               <Shield className="w-6 h-6 text-[#EEEEEE]" />
             </div>
-            <span className="text-xl font-bold text-[#EEEEEE]">CredentialVault</span>
+            <span className="text-xl font-bold text-[#EEEEEE]">VERITASID</span>
           </div>
 
           <div className="hidden md:flex items-center space-x-8">

@@ -2,9 +2,28 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false, // Disable default body parser to use custom configuration
+  });
+
+  // Configure custom body parsers with increased limits for template data
+  app.use(bodyParser.json({ 
+    limit: '10mb', // Increase limit for JSON payloads (templates with components and images)
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf; // Store raw body for potential future use
+    }
+  }));
+  
+  app.use(bodyParser.urlencoded({ 
+    limit: '10mb', // Increase limit for URL-encoded payloads
+    extended: true,
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf; // Store raw body for potential future use
+    }
+  }));
 
   // Menggunakan ValidationPipe secara global untuk semua endpoint.
   // Ini adalah praktik terbaik untuk memastikan semua data masuk (DTO)
@@ -31,5 +50,6 @@ async function bootstrap() {
   // Backend akan berjalan di port 3001, sesuai dengan konfigurasi di docker-compose.yml
   await app.listen(3001);
   console.log(`Application is running on: ${await app.getUrl()}`);
+  console.log('Body size limits configured: JSON and URL-encoded payloads up to 10MB');
 }
 bootstrap();

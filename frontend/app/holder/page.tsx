@@ -389,7 +389,7 @@ export default function HolderPage() {
             </main>
             
             <footer className="relative z-10 p-6 text-center text-[#EEEEEE]/70 border-t border-[#EEEEEE]/10 mt-12">
-                <p>&copy; {new Date().getFullYear()} CredentialVault. Powered by Blockchain Technology.</p>
+                <p>&copy; {new Date().getFullYear()} VERITASID. Powered by Blockchain Technology.</p>
             </footer>
         </div>
     );

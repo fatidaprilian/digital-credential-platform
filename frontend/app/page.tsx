@@ -69,10 +69,10 @@ const Section = ({ children, className = "" }: { children: React.ReactNode; clas
 const FAQ = () => {
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const faqs = [
-        { question: "Apa itu CredentialVault?", answer: "CredentialVault adalah platform revolusioner yang menggunakan teknologi blockchain untuk menyimpan dan memverifikasi kredensial digital secara aman, transparan, dan anti-pemalsuan." },
+        { question: "Apa itu VERITASID?", answer: "VERITASID adalah platform revolusioner yang menggunakan teknologi blockchain untuk menyimpan dan memverifikasi kredensial digital secara aman, transparan, dan anti-pemalsuan." },
         { question: "Bagaimana cara kerja verifikasi blockchain?", answer: "Setiap kredensial disimpan sebagai Soulbound Token (SBT) di blockchain Polygon. Data tersimpan di IPFS dan dapat diverifikasi secara real-time tanpa perlu menghubungi institusi penerbit." },
         { question: "Apakah kredensial saya aman?", answer: "Ya, sangat aman. Kredensial Anda tersimpan di blockchain yang immutable dan menggunakan enkripsi tingkat enterprise. Hanya Anda yang memiliki kontrol penuh atas data tersebut." },
-        { question: "Berapa biaya menggunakan CredentialVault?", answer: "Untuk pemegang kredensial (holder) gratis sepenuhnya. Institusi penerbit dikenakan biaya Rp50 per dokumen atau berlangganan Rp250rb/bulan unlimited." },
+        { question: "Berapa biaya menggunakan VERITASID?", answer: "Untuk pemegang kredensial (holder) gratis sepenuhnya. Institusi penerbit dikenakan biaya Rp50 per dokumen atau berlangganan Rp250rb/bulan unlimited." },
         { question: "Apakah bisa digunakan di luar negeri?", answer: "Tentu saja! Karena berbasis blockchain, kredensial Anda dapat diverifikasi di mana saja di dunia tanpa batas geografis atau waktu." }
     ];
     return (
@@ -147,7 +147,7 @@ export default function HomePage() {
             </>
         ) : (
             <>
-                <button onClick={() => handleNavigation('/dashboard/holder')} className={`${buttonClass} bg-[#00ADB5] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-[#EEEEEE]`}>
+                <button onClick={() => handleNavigation('/holder')} className={`${buttonClass} bg-[#00ADB5] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-[#EEEEEE]`}>
                     Buka Galeri Saya
                 </button>
                  <button onClick={() => handleNavigation('/verify')} className={`${buttonClass} bg-transparent border-2 border-[#EEEEEE]/50 text-[#EEEEEE]/80 hover:bg-[#EEEEEE]/10 hover:text-white`}>
@@ -190,11 +190,11 @@ export default function HomePage() {
                 </motion.div>
                 
                 <div className="relative z-20 bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831]">
-                    {/* What is CredentialVault Section */}
+                    {/* What is VERITASID Section */}
                     <Section>
                         <div className="max-w-7xl mx-auto">
                             <div className="text-center mb-12 sm:mb-16">
-                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Apa itu <span className="text-[#00ADB5]">CredentialVault</span>?</h2>
+                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Apa itu <span className="text-[#00ADB5]">VERITASID</span>?</h2>
                                 <p className="text-lg sm:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed">Revolusi dalam pengelolaan kredensial digital menggunakan teknologi blockchain terdepan.</p>
                             </div>
                             <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
@@ -209,7 +209,7 @@ export default function HomePage() {
                     <Section className="bg-black/20">
                         <div className="max-w-7xl mx-auto">
                             <div className="text-center mb-12 sm:mb-16">
-                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Cara Kerja <span className="text-[#00ADB5]">CredentialVault</span></h2>
+                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Cara Kerja <span className="text-[#00ADB5]">VERITASID</span></h2>
                                 <p className="text-lg sm:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed">Proses sederhana untuk pengelolaan kredensial digital yang aman dan terverifikasi.</p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -226,7 +226,7 @@ export default function HomePage() {
                         <div className="max-w-7xl mx-auto">
                             <div className="text-center mb-12 sm:mb-16">
                                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-                                    Siapa yang Menggunakan <span className="text-[#00ADB5]">CredentialVault</span>?
+                                    Siapa yang Menggunakan <span className="text-[#00ADB5]">VERITASID</span>?
                                 </h2>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -255,7 +255,7 @@ export default function HomePage() {
                     <Section className="bg-black/20">
                          <div className="max-w-7xl mx-auto">
                             <div className="text-center mb-12 sm:mb-16">
-                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Keunggulan <span className="text-[#00ADB5]">CredentialVault</span></h2>
+                                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Keunggulan <span className="text-[#00ADB5]">VERITASID</span></h2>
                             </div>
                             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                                 <div className="space-y-8">
@@ -296,7 +296,7 @@ export default function HomePage() {
                         <div className="max-w-4xl mx-auto">
                              <div className="text-center mb-12 sm:mb-16">
                                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Pertanyaan yang Sering Ditanyakan</h2>
-                                <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">Temukan jawaban untuk pertanyaan umum tentang CredentialVault.</p>
+                                <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">Temukan jawaban untuk pertanyaan umum tentang VERITASID.</p>
                             </div>
                             <FAQ />
                         </div>
@@ -324,10 +324,10 @@ export default function HomePage() {
                                     <div className="bg-gradient-to-r from-[#00ADB5] to-[#393E46] p-3 rounded-xl">
                                         <Shield className="w-8 h-8 text-white" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white">CredentialVault</span>
+                                    <span className="text-2xl font-bold text-white">VERITASID</span>
                                 </div>
                                 <div className="text-gray-400 text-sm">
-                                    <p>© {new Date().getFullYear()} CredentialVault. Semua hak dilindungi undang-undang.</p>
+                                    <p>© {new Date().getFullYear()} VERITASID. Semua hak dilindungi undang-undang.</p>
                                     <p className="mt-1">Powered by Blockchain Technology</p>
                                 </div>
                             </div>
