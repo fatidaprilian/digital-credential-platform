@@ -41,11 +41,16 @@ async function bootstrap() {
   // Mengaktifkan CORS (Cross-Origin Resource Sharing) dengan konfigurasi spesifik.
   // Ini akan mengizinkan frontend di http://localhost:3000 untuk berkomunikasi
   // dengan backend ini.
-  app.enableCors({
-    origin: 'http://localhost:3000',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (frontendUrl) {
+    const allowedOrigins = frontendUrl.split(',').map(url => url.trim());
+    app.enableCors({
+      origin: allowedOrigins,
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      credentials: true,
+    });
+    console.log('CORS enabled for:', allowedOrigins); // Log untuk debugging
+  }
 
   // Backend akan berjalan di port 3001, sesuai dengan konfigurasi di docker-compose.yml
   await app.listen(3001);
