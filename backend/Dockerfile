@@ -32,7 +32,7 @@ RUN npm install
 COPY . .
 RUN npx prisma generate
 
-RUN npx prisma migrate deploy
+RUN npx prisma migrate baseline --name "20250809094915_add_public_id_to_issuance_log"
 
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
