@@ -33,7 +33,7 @@ COPY . .
 RUN npx prisma generate
 
 # INI PERBAIKANNYA
-RUN npx prisma migrate resolve --applied "20250803054306_update_payment_relations"
+RUN npx prisma migrate deploy
 
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
