@@ -33,7 +33,7 @@ COPY . .
 RUN npx prisma generate
 
 # INI PERBAIKANNYA
-RUN npx prisma migrate resolve --rolled-back "20250809094915_add_public_id_to_issuance_log"
+RUN npx prisma migrate deploy
 
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
