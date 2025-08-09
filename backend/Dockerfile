@@ -33,7 +33,7 @@ COPY . .
 RUN npx prisma generate
 
 # INI PERBAIKANNYA
-RUN npx prisma migrate resolve --applied "20250728075426_add_holder_profile"
+RUN npx prisma migrate deploy
 
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
