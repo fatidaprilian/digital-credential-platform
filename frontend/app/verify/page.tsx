@@ -20,7 +20,7 @@ import {
   Copy
 } from "lucide-react";
 
-// --- Types --- (sama seperti sebelumnya)
+// --- Types ---
 interface VerificationResult {
   isRevoked: boolean;
   owner: string;
@@ -36,9 +36,11 @@ interface CredentialMetadata {
   }[];
 }
 
+// REVISI: Tipe data IssuanceLog disesuaikan dengan respons backend baru
 interface IssuanceLog {
   transactionHash: string;
   issuedAt: string;
+  onChainTokenId: string; // ID asli di blockchain
 }
 
 // --- Environment Variables & Constants ---
@@ -117,7 +119,7 @@ const BackButton = ({ className = "" }: { className?: string }) => (
 
 // --- Main Component ---
 export default function VerifyPage() {
-  const [tokenId, setTokenId] = useState("");
+  const [publicId, setPublicId] = useState(""); // REVISI: State ini sekarang menyimpan publicId
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [metadata, setMetadata] = useState<CredentialMetadata | null>(null);
   const [issuanceLog, setIssuanceLog] = useState<IssuanceLog | null>(null);
@@ -133,8 +135,8 @@ export default function VerifyPage() {
   };
 
   const handleVerification = async () => {
-    if (!tokenId.trim()) {
-      setError("Harap masukkan ID Token.");
+    if (!publicId.trim()) {
+      setError("Harap masukkan ID Kredensial.");
       return;
     }
     
@@ -145,33 +147,39 @@ export default function VerifyPage() {
     setError(null);
 
     try {
+      // --- REVISI UTAMA: ALUR VERIFIKASI BARU ---
+
+      // 1. Ambil data log dari backend menggunakan publicId
+      const logResponse = await fetch(`${backendApiUrl}/credentials/log/${publicId.trim()}`);
+      if (!logResponse.ok) {
+        const errorData = await logResponse.json();
+        throw new Error(errorData.message || "ID Kredensial tidak valid atau tidak ditemukan.");
+      }
+      
+      const fetchedLog: IssuanceLog = await logResponse.json();
+      setIssuanceLog(fetchedLog);
+      
+      const onChainTokenId = fetchedLog.onChainTokenId; // Ini adalah ID asli di blockchain
+
+      // 2. Lanjutkan verifikasi ke blockchain menggunakan onChainTokenId
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, abi, provider);
       
       const [tokenURI, isRevoked, owner] = await Promise.all([
-        contract.tokenURI(BigInt(tokenId)),
-        contract.isRevoked(BigInt(tokenId)),
-        contract.ownerOf(BigInt(tokenId)),
+        contract.tokenURI(BigInt(onChainTokenId)),
+        contract.isRevoked(BigInt(onChainTokenId)),
+        contract.ownerOf(BigInt(onChainTokenId)),
       ]);
       
       setResult({ isRevoked, owner });
 
+      // 3. Ambil metadata dari IPFS (logika ini tetap sama)
       const metadataUrl = formatIpfsUrl(tokenURI);
       const metadataResponse = await fetch(metadataUrl);
       if (!metadataResponse.ok) throw new Error("Tidak dapat mengambil metadata kredensial.");
       
       const fetchedMetadata: CredentialMetadata = await metadataResponse.json();
       setMetadata(fetchedMetadata);
-
-      try {
-        const logResponse = await fetch(`${backendApiUrl}/credentials/log/${tokenId}`);
-        if (logResponse.ok) {
-          const fetchedLog: IssuanceLog = await logResponse.json();
-          setIssuanceLog(fetchedLog);
-        }
-      } catch (logError) {
-        console.warn(`Tidak dapat mengambil log penerbitan untuk token ${tokenId}:`, logError);
-      }
 
       setShowForm(false);
 
@@ -181,11 +189,8 @@ export default function VerifyPage() {
       setMetadata(null);
       setIssuanceLog(null);
       
-      if (e.code === 'CALL_EXCEPTION' || (e.info && e.info.error && e.info.error.message.includes("nonexistent token"))) {
-        setError(`Verifikasi gagal. ID Token "${tokenId}" tidak ditemukan di blockchain.`);
-      } else {
-        setError(e.message || "Terjadi kesalahan yang tidak terduga saat verifikasi.");
-      }
+      // Pesan error lebih umum karena bisa berasal dari backend atau blockchain
+      setError(e.message || "Terjadi kesalahan yang tidak terduga saat verifikasi.");
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +202,7 @@ export default function VerifyPage() {
     setMetadata(null);
     setIssuanceLog(null);
     setError(null);
-    setTokenId("");
+    setPublicId("");
   };
 
   const renderVerificationForm = () => (
@@ -218,31 +223,31 @@ export default function VerifyPage() {
             Verifikasi Kredensial
           </h1>
           <p className="text-[#EEEEEE]/70 text-xs sm:text-sm px-2">
-            Masukkan ID Token untuk memverifikasi keaslian dan status kredensial digital Anda.
+            Masukkan ID Kredensial unik untuk memverifikasi keaslian dan statusnya.
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label htmlFor="tokenId" className="block text-sm font-medium text-[#EEEEEE]/80 mb-2">
-              ID Token
+            <label htmlFor="publicId" className="block text-sm font-medium text-[#EEEEEE]/80 mb-2">
+              ID Kredensial
             </label>
+            {/* REVISI: type diubah menjadi "text" untuk menerima UUID */}
             <input
-              id="tokenId"
-              type="number"
-              value={tokenId}
-              onChange={(e) => setTokenId(e.target.value)}
-              placeholder="Masukkan ID Token (contoh: 1)"
-              min="0"
-              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-[#393E46]/50 border border-[#EEEEEE]/20 rounded-lg text-white placeholder:text-[#EEEEEE]/50 focus:ring-2 focus:ring-[#00ADB5] focus:border-[#00ADB5] outline-none transition-all text-sm sm:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              id="publicId"
+              type="text" 
+              value={publicId}
+              onChange={(e) => setPublicId(e.target.value)}
+              placeholder="Masukkan ID unik kredensial"
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-[#393E46]/50 border border-[#EEEEEE]/20 rounded-lg text-white placeholder:text-[#EEEEEE]/50 focus:ring-2 focus:ring-[#00ADB5] focus:border-[#00ADB5] outline-none transition-all text-sm sm:text-base"
               disabled={isLoading}
-              onKeyUp={(e) => e.key === 'Enter' && !isLoading && tokenId.trim() && handleVerification()}
+              onKeyUp={(e) => e.key === 'Enter' && !isLoading && publicId.trim() && handleVerification()}
             />
           </div>
           
           <button
             onClick={handleVerification}
-            disabled={isLoading || !tokenId.trim()}
+            disabled={isLoading || !publicId.trim()}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-[#00ADB5] text-white font-semibold rounded-lg hover:bg-[#00ADB5]/90 transition-all disabled:bg-gray-500 disabled:cursor-not-allowed disabled:opacity-60 text-sm sm:text-base"
           >
             {isLoading ? (
@@ -276,7 +281,8 @@ export default function VerifyPage() {
   );
 
   const renderResultCard = () => {
-    if (!result || !metadata) return null;
+    // REVISI: Pastikan issuanceLog ada sebelum render
+    if (!result || !metadata || !issuanceLog) return null;
 
     const imageUrl = formatIpfsUrl(metadata.image);
     const textAttributes = metadata.attributes.filter(
@@ -317,7 +323,7 @@ export default function VerifyPage() {
               {/* Title */}
               <div className="break-words">
                 <h2 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white mb-2 leading-tight">
-                  Terakhir aja for
+                  {metadata.name}
                 </h2>
                 <div className="bg-[#393E46]/40 p-3 rounded-lg border border-[#EEEEEE]/5">
                   <p className="text-xs sm:text-sm font-mono text-[#00ADB5] break-all leading-relaxed">
@@ -359,21 +365,21 @@ export default function VerifyPage() {
                   Detail Blockchain
                 </h3>
                 <div className="space-y-3">
-                  {/* ID Token */}
+                  {/* REVISI: Tampilkan onChainTokenId dari log */}
                   <div className="bg-[#393E46]/40 p-3 rounded-lg border border-[#EEEEEE]/5">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="font-semibold text-[#EEEEEE]/60 flex items-center gap-2 text-xs sm:text-sm flex-shrink-0">
-                        <Hash size={14}/>ID Token
+                        <Hash size={14}/>ID Token (On-Chain)
                       </span>
                       <button
-                        onClick={() => handleCopy(tokenId, 'tokenId')}
+                        onClick={() => handleCopy(issuanceLog.onChainTokenId, 'tokenId')}
                         className="text-[#00ADB5] hover:text-[#00ADB5]/80 transition-colors"
                       >
                         <Copy size={14} />
                       </button>
                     </div>
                     <p className="font-mono text-[#00ADB5] text-xs sm:text-sm break-all">
-                      {tokenId}
+                      {issuanceLog.onChainTokenId}
                     </p>
                     {copiedText === 'tokenId' && (
                       <p className="text-xs text-green-400 mt-1">Tersalin!</p>
@@ -487,14 +493,11 @@ export default function VerifyPage() {
     <main className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] text-[#EEEEEE] relative overflow-hidden">
       <FloatingParticles />
       
-      {/* Container with proper padding and spacing */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header with Back Button */}
         <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8">
           <BackButton />
         </header>
 
-        {/* Main Content Area */}
         <div className="flex-grow flex items-center justify-center px-4 pb-8">
           {showForm ? renderVerificationForm() : renderResultCard()}
         </div>

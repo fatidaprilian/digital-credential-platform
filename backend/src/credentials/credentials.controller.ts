@@ -13,10 +13,24 @@ import { IssueCredentialBatchDto } from './dto/issue-credential-batch.dto';
 export class CredentialsController {
   constructor(private readonly credentialsService: CredentialsService) {}
 
-  // --- ENDPOINT BARU UNTUK VERIFIKASI PUBLIK ---
+  /**
+   * --- ENDPOINT BARU ---
+   * Mengambil detail (termasuk publicId) untuk sekumpulan tokenId.
+   * Digunakan oleh halaman galeri holder untuk mencocokkan on-chain ID dengan public ID.
+   */
+  @Post('batch-details')
+  async getBatchDetails(@Body() body: { tokenIds: string[] }) {
+    return this.credentialsService.getBatchDetailsByTokenIds(body.tokenIds);
+  }
+
+  /**
+   * Endpoint untuk verifikasi publik.
+   * Parameter ':tokenId' di sini akan diterima sebagai publicId (UUID) dari frontend.
+   */
   @Get('log/:tokenId')
   async getIssuanceLog(@Param('tokenId') tokenId: string) {
     try {
+        // Memanggil service yang sudah direvisi untuk mencari berdasarkan publicId
         return await this.credentialsService.getIssuanceLogByTokenId(tokenId);
     } catch (error) {
         if (error instanceof NotFoundException) {
@@ -26,15 +40,19 @@ export class CredentialsController {
     }
   }
 
-  // --- ENDPOINT BARU UNTUK RIWAYAT ---
+  /**
+   * Endpoint untuk mengambil riwayat penerbitan institusi.
+   */
   @Get('history')
   @UseGuards(AuthGuard('jwt'))
   async getHistory(@Req() req: Request) {
     const user = req.user as User;
     return this.credentialsService.getHistoryForInstitution(user);
   }
-  // --- AKHIR ENDPOINT BARU ---
 
+  /**
+   * Endpoint untuk menerbitkan kredensial secara batch.
+   */
   @Post('issue-batch')
   @UseGuards(AuthGuard('jwt'))
   async issueCredentialBatch(
@@ -49,6 +67,9 @@ export class CredentialsController {
     };
   }
 
+  /**
+   * Endpoint untuk menerbitkan satu kredensial.
+   */
   @Post('issue')
   @UseGuards(AuthGuard('jwt'))
   async issueCredential(
@@ -63,6 +84,9 @@ export class CredentialsController {
     };
   }
 
+  /**
+   * Endpoint legacy/internal untuk minting langsung (jika masih diperlukan).
+   */
   @Post('mint')
   @UseGuards(AuthGuard('jwt'))
   async mintCredential(@Body(new ValidationPipe()) mintDto: MintCredentialDto) {

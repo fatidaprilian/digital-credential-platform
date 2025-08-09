@@ -32,6 +32,8 @@ RUN npm install
 COPY . .
 RUN npx prisma generate
 
+RUN npx prisma migrate deploy
+
 # Expose port yang digunakan oleh aplikasi NestJS
 EXPOSE 3001
 

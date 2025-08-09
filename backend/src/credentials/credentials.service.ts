@@ -43,62 +43,68 @@ export class CredentialsService {
     private readonly ipfsService: IpfsService,
   ) {}
 
+  // --- FUNGSI BARU DITAMBAHKAN DI SINI ---
   /**
-   * Mengambil riwayat penerbitan untuk institusi yang terkait dengan user.
+   * Mengambil detail (termasuk publicId) untuk sekumpulan tokenId.
+   * Digunakan oleh halaman galeri holder.
    */
+  async getBatchDetailsByTokenIds(tokenIds: string[]) {
+    if (!tokenIds || tokenIds.length === 0) {
+      return [];
+    }
+
+    const credentialIds = tokenIds.map(id => BigInt(id));
+
+    const logs = await this.prisma.issuanceLog.findMany({
+      where: {
+        credentialId: {
+          in: credentialIds,
+        },
+      },
+      select: {
+        credentialId: true,
+        publicId: true,
+      },
+    });
+
+    // Mengubah BigInt menjadi string agar aman saat dikirim sebagai JSON
+    return logs.map(log => ({
+      credentialId: log.credentialId.toString(),
+      publicId: log.publicId,
+    }));
+  }
+
   async getHistoryForInstitution(user: User) {
     if (!user.institutionId) {
       throw new BadRequestException('User tidak terhubung dengan institusi manapun.');
     }
-
     const logs = await this.prisma.issuanceLog.findMany({
-      where: {
-        template: {
-          institutionId: user.institutionId,
-        },
-      },
-      include: {
-        template: {
-          select: { name: true },
-        },
-      },
-      orderBy: {
-        issuedAt: 'desc',
-      },
+      where: { template: { institutionId: user.institutionId } },
+      include: { template: { select: { name: true } } },
+      orderBy: { issuedAt: 'desc' },
     });
-
     return logs.map(log => ({
       ...log,
       credentialId: log.credentialId ? log.credentialId.toString() : null,
     }));
   }
 
-  /**
-   * Mengambil log penerbitan berdasarkan Token ID untuk halaman verifikasi.
-   * Menggunakan findFirst yang dioptimalkan dengan @@index pada skema.
-   */
-  async getIssuanceLogByTokenId(tokenId: string) {
-    const credentialId = BigInt(tokenId);
-
-    const log = await this.prisma.issuanceLog.findFirst({
-      where: { credentialId },
-      select: {
-        transactionHash: true,
-        issuedAt: true,
-      },
+  async getIssuanceLogByTokenId(publicId: string) {
+    const log = await this.prisma.issuanceLog.findUnique({
+      where: { publicId },
     });
-
     if (!log) {
-      throw new NotFoundException(`Log for Token ID ${tokenId} not found.`);
+      throw new NotFoundException(`Kredensial dengan ID ${publicId} tidak ditemukan.`);
     }
-
-    return log;
+    return {
+      transactionHash: log.transactionHash,
+      issuedAt: log.issuedAt,
+      onChainTokenId: log.credentialId.toString(),
+    };
   }
 
-  /**
-   * Memproses dan menerbitkan sekumpulan kredensial dalam satu transaksi (batch).
-   * Logika ini tetap ada dan tidak berubah.
-   */
+  // ... (Sisa fungsi issue, issueBatch, mint, dll. tidak ada perubahan)
+  // [PASTIKAN ANDA MENYALIN FUNGSI BARU DI ATAS DAN MEMBIARKAN FUNGSI LAINNYA TETAP ADA]
   async issueBatch(issueBatchDto: IssueCredentialBatchDto, user: User): Promise<{ txHash: string; count: number }> {
     const { batch } = issueBatchDto;
     const batchSize = batch.length;
@@ -189,9 +195,6 @@ export class CredentialsService {
     return { txHash, count: batchSize };
   }
 
-  /**
-   * Berinteraksi dengan smart contract untuk melakukan minting batch dan mem-parse event.
-   */
   async mintBatch(tos: string[], tokenURIs: string[]): Promise<{ txHash: string; fromTokenId: bigint; toTokenId: bigint }> {
     let tx;
     try {
@@ -235,9 +238,6 @@ export class CredentialsService {
     }
   }
 
-  /**
-   * Menerbitkan satu kredensial.
-   */
   async issue(issueDto: IssueCredentialDto, user: User): Promise<string> {
     const { templateId, recipientAddress, dynamicData } = issueDto;
 
@@ -344,9 +344,6 @@ export class CredentialsService {
     return txHash;
   }
   
-  /**
-   * Membuat gambar kredensial dengan menggabungkan template dan data dinamis.
-   */
   private async createCredentialImage(
     template: CredentialTemplate,
     dynamicData: Record<string, string>,
@@ -436,9 +433,6 @@ export class CredentialsService {
     ctx.fillText(text, textX, textY, width);
   }
 
-  /**
-   * Berinteraksi dengan smart contract untuk melakukan minting tunggal dan mem-parse event.
-   */
   async mint(
     mintCredentialDto: MintCredentialDto,
   ): Promise<{ txHash: string; credentialId: bigint }> {

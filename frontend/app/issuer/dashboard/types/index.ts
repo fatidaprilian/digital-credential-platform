@@ -31,6 +31,7 @@ export interface UserProfile {
 
 export interface IssuanceLog {
   id: number;
+  publicId: string;
   credentialId: string | null; // Pastikan string untuk BigInt
   recipientAddress: string;
   transactionHash: string;

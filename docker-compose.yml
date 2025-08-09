@@ -6,6 +6,7 @@ services:
     container_name: api_service
     ports:
       - "3001:3001"
+      - "5555:5555"
     depends_on:
       - db
       - redis

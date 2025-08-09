@@ -102,6 +102,7 @@ model CredentialTemplate {
 
 model IssuanceLog {
   id               Int                @id @default(autoincrement())
+  publicId         String             @unique @default(uuid()) // <-- TAMBAHKAN BARIS INI
   credentialId     BigInt
   templateId       Int
   recipientAddress String
@@ -111,7 +112,7 @@ model IssuanceLog {
   template         CredentialTemplate @relation(fields: [templateId], references: [id])
 
   @@unique([transactionHash, credentialId])
-  @@index([credentialId]) // Pastikan baris ini ada untuk optimasi
+  @@index([credentialId])
 }
 
 model TransactionLog {
