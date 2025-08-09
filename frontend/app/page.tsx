@@ -182,16 +182,31 @@ const StepCard = ({ title, description, icon: Icon, index }: any) => {
     );
 };
 
-const StatCard = ({ value, label, icon: Icon }: { value: string; label: string; icon: any }) => (
+// Fixed StatCard Component with better mobile visibility
+const StatCard = ({ value, label, icon: Icon, index }: { value: string; label: string; icon: any; index: number }) => (
     <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="bg-[#222831]/60 backdrop-blur-lg border border-[#EEEEEE]/20 rounded-xl p-6 text-center hover:border-[#00ADB5]/50 transition-all duration-300"
+        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ 
+            duration: 0.6, 
+            delay: 0.8 + (index * 0.1),  // Delay lebih lama agar tidak terpengaruh scroll
+            type: "spring",
+            stiffness: 100
+        }}
+        whileHover={{ 
+            scale: 1.05, 
+            y: -2,
+            transition: { duration: 0.2 }
+        }}
+        className="bg-[#222831]/70 backdrop-blur-lg border border-[#EEEEEE]/20 rounded-xl p-4 sm:p-6 text-center hover:border-[#00ADB5]/50 hover:bg-[#222831]/90 transition-all duration-300 group"
     >
-        <Icon className="w-8 h-8 text-[#00ADB5] mx-auto mb-3" />
-        <div className="text-3xl font-bold text-white mb-2">{value}</div>
-        <div className="text-sm text-[#EEEEEE]/70">{label}</div>
+        <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-[#00ADB5] mx-auto mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-300" />
+        <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 group-hover:text-[#00ADB5] transition-colors">
+            {value}
+        </div>
+        <div className="text-xs sm:text-sm text-[#EEEEEE]/70 group-hover:text-[#EEEEEE]/90 transition-colors">
+            {label}
+        </div>
     </motion.div>
 );
 
@@ -203,8 +218,9 @@ export default function HomePage() {
     const { connect, isConnected, isLoading } = useWeb3Auth();
     const { scrollY } = useScroll();
 
-    const y1 = useTransform(scrollY, [0, 500], [0, -100]);
-    const opacity = useTransform(scrollY, [0, 400], [1, 0]);
+    // Reduced scroll effect untuk mobile
+    const y1 = useTransform(scrollY, [0, 800], [0, -50]); // Reduced from -100 to -50
+    const opacity = useTransform(scrollY, [0, 600], [1, 0.3]); // Changed dari 0 ke 0.3 agar tidak hilang total
 
     const handleNavigation = (path: string) => router.push(path);
 
@@ -278,62 +294,67 @@ export default function HomePage() {
 
             <main>
                 {/* Hero Section */}
-                <motion.div style={{ y: y1, opacity }} className="relative z-10 pt-32 sm:pt-28">
+                <div className="relative z-10 pt-32 sm:pt-28">
                     <Section>
                         <div className="text-center max-w-7xl mx-auto">
+                            {/* Hero Content - dengan scroll effect yang reduced */}
                             <motion.div 
-                                initial={{ opacity: 0, y: 30 }} 
-                                animate={{ opacity: 1, y: 0 }} 
-                                transition={{ duration: 0.8 }} 
+                                style={{ 
+                                    y: y1, 
+                                    opacity: typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : opacity // Disable opacity effect on mobile
+                                }} 
                                 className="mb-8"
                             >
-                                <motion.span 
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00ADB5] to-[#393E46] text-white px-6 py-3 rounded-full text-sm font-semibold mb-8 hover:scale-105 transition-transform duration-300"
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 30 }} 
+                                    animate={{ opacity: 1, y: 0 }} 
+                                    transition={{ duration: 0.8 }} 
                                 >
-                                    <Sparkles className="w-4 h-4" />
-                                    Platform Kredensial Digital Terdepan
-                                    <Verified className="w-4 h-4" />
-                                </motion.span>
-                                
-                                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-                                    Kredensial Digital<br />
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00ADB5] via-white to-[#00ADB5]">
-                                        Terverifikasi & Aman
-                                    </span>
-                                </h1>
-                                
-                                <p className="text-lg sm:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed mb-10">
-                                    Platform revolusioner yang menggunakan teknologi blockchain untuk menyimpan dan memverifikasi kredensial digital Anda dengan keamanan tingkat enterprise dan aksesibilitas global.
-                                </p>
+                                    <motion.span 
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00ADB5] to-[#393E46] text-white px-6 py-3 rounded-full text-sm font-semibold mb-8 hover:scale-105 transition-transform duration-300"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        Platform Kredensial Digital Terdepan
+                                        <Verified className="w-4 h-4" />
+                                    </motion.span>
+                                    
+                                    <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+                                        Kredensial Digital<br />
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00ADB5] via-white to-[#00ADB5]">
+                                            Terverifikasi & Aman
+                                        </span>
+                                    </h1>
+                                    
+                                    <p className="text-lg sm:text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed mb-10">
+                                        Platform revolusioner yang menggunakan teknologi blockchain untuk menyimpan dan memverifikasi kredensial digital Anda dengan keamanan tingkat enterprise dan aksesibilitas global.
+                                    </p>
+                                </motion.div>
+
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }} 
+                                    animate={{ opacity: 1, y: 0 }} 
+                                    transition={{ delay: 0.4, duration: 0.8 }} 
+                                    className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 px-4"
+                                >
+                                   <ActionButtons />
+                                </motion.div>
                             </motion.div>
 
-                            <motion.div 
-                                initial={{ opacity: 0, y: 20 }} 
-                                animate={{ opacity: 1, y: 0 }} 
-                                transition={{ delay: 0.4, duration: 0.8 }} 
-                                className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 px-4"
-                            >
-                               <ActionButtons />
-                            </motion.div>
-
-                            {/* Stats Section */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.6, duration: 0.8 }}
-                                className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto"
-                            >
-                                <StatCard value="99.9%" label="Keamanan Data" icon={Shield} />
-                                <StatCard value="24/7" label="Aksesibilitas" icon={Clock} />
-                                <StatCard value="Global" label="Jangkauan" icon={Globe} />
-                                <StatCard value="Instant" label="Verifikasi" icon={Zap} />
-                            </motion.div>
+                            {/* Stats Section - DIPISAH dari scroll effect */}
+                            <div className="relative z-10">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                                    <StatCard value="99.9%" label="Keamanan Data" icon={Shield} index={0} />
+                                    <StatCard value="24/7" label="Aksesibilitas" icon={Clock} index={1} />
+                                    <StatCard value="Global" label="Jangkauan" icon={Globe} index={2} />
+                                    <StatCard value="Instant" label="Verifikasi" icon={Zap} index={3} />
+                                </div>
+                            </div>
                         </div>
                     </Section>
-                </motion.div>
+                </div>
                 
                 <div className="relative z-20 bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831]">
                     {/* What is VERITASID Section */}
@@ -684,7 +705,6 @@ export default function HomePage() {
                                             height={32}
                                             className="w-8 h-8"
                                         />
-                                    
                                     <span className="text-2xl font-bold text-white">VERITASID</span>
                                 </motion.div>
                                 
