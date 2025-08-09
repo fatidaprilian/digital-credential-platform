@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, FilePlus, LayoutTemplate, Send, Trash2, Edit, CreditCard, FileSpreadsheet, History } from 'lucide-react';
+import { LogOut, FilePlus, LayoutTemplate, Send, Trash2, Edit, CreditCard, FileSpreadsheet, History, User, Settings } from 'lucide-react';
 
 // Import components
 import { FloatingParticles } from './components/FloatingParticles';
@@ -20,21 +20,10 @@ import { Template, UserProfile, IssuanceLog } from './types';
 
 const TemplateBuilder = dynamic(() => import('@/components/TemplateBuilder'), {
   ssr: false,
+  loading: () => <div className="min-h-[80vh] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00ADB5]"></div></div>,
 });
 
-export default function IssuerDashboardPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00ADB5]"></div>
-      </div>
-    }>
-      <IssuerDashboard />
-    </Suspense>
-  )
-}
-
-function IssuerDashboard() {
+function IssuerDashboardPageContent() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [issuanceHistory, setIssuanceHistory] = useState<IssuanceLog[]>([]);
@@ -83,8 +72,8 @@ function IssuerDashboard() {
       showAlert('Pembayaran gagal atau dibatalkan. Silakan coba lagi.', 'error');
     }
 
-    if (initialTab === 'billing') {
-      setActiveTab('billing');
+    if (initialTab && ['issue', 'batch-issue', 'templates', 'builder', 'billing', 'history'].includes(initialTab)) {
+      setActiveTab(initialTab as any);
     }
 
     if (paymentStatus || initialTab) {
@@ -124,12 +113,13 @@ function IssuerDashboard() {
       }
     };
     fetchData();
-  }, [router, fetchHistory, showAlert]);
+  }, [router, fetchHistory, showAlert, searchParams]);
 
   const handleBatchComplete = () => {
     const token = localStorage.getItem('access_token');
+    showAlert('Proses batch berhasil dimulai. Riwayat akan segera diperbarui.', 'success');
     if (token) {
-      fetchHistory(token);
+        setTimeout(() => fetchHistory(token), 2000); // give backend some time to process
     }
   };
 
@@ -141,25 +131,16 @@ function IssuerDashboard() {
 
         const response = await fetch(`${apiUrl}/template-builder`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(templateData),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Error server: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error((await response.json()).message || 'Gagal menyimpan template.');
         const savedTemplate = await response.json();
-
         setTemplates(prev => [savedTemplate, ...prev]);
         setActiveTab('templates');
         showAlert('Template berhasil disimpan!', 'success');
     } catch (err: any) {
-        console.error('Save template error:', err);
         showAlert(`Gagal menyimpan template: ${err.message}`, 'error');
     } finally {
         setIsSaving(false);
@@ -178,14 +159,9 @@ function IssuerDashboard() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Gagal menghapus template');
-      }
-
+      if (!response.ok) throw new Error((await response.json()).message || 'Gagal menghapus template');
       setTemplates(prev => prev.filter(t => t.id !== templateId));
       showAlert('Template berhasil dihapus!', 'success');
-
     } catch (err: any) {
       showAlert(`Gagal menghapus template: ${err.message}`, 'error');
     }
@@ -199,48 +175,85 @@ function IssuerDashboard() {
   if (loading) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center text-white">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00ADB5]"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 border-[#00ADB5]"></div>
         </div>
     );
   }
 
   const tabs = [
-    { id: 'issue', label: 'Terbitkan', icon: Send },
-    { id: 'batch-issue', label: 'Batch (CSV)', icon: FileSpreadsheet },
-    { id: 'templates', label: 'Kelola Template', icon: LayoutTemplate },
+    { id: 'issue', label: 'Terbitkan Satuan', icon: Send },
+    { id: 'batch-issue', label: 'Terbitkan Batch', icon: FileSpreadsheet },
+    { id: 'templates', label: 'Template Saya', icon: LayoutTemplate },
     { id: 'history', label: 'Riwayat', icon: History },
-    { id: 'builder', label: 'Desain Template', icon: FilePlus },
-    { id: 'billing', label: 'Billing', icon: CreditCard },
+    { id: 'builder', label: 'Desain Baru', icon: FilePlus },
+    { id: 'billing', label: 'Billing & Kredit', icon: CreditCard },
   ];
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Selamat Pagi';
+    if (hour < 18) return 'Selamat Siang';
+    return 'Selamat Malam';
+  };
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] relative overflow-x-hidden text-[#EEEEEE]">
         <FloatingParticles />
-        {error && <Alert message={error} type="error" onClose={() => setError(null)} />}
-        {success && <Alert message={success} type="success" onClose={() => setSuccess(null)} />}
+        <AnimatePresence>
+            {error && <Alert message={error} type="error" onClose={() => setError(null)} />}
+            {success && <Alert message={success} type="success" onClose={() => setSuccess(null)} />}
+        </AnimatePresence>
 
         <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-            <header className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-12 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div className="flex-1">
-                    <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                        Dasbor Penerbit
-                    </h1>
-                    <p className="text-lg text-gray-300 mt-1">
-                        {user?.institution?.name ?? user?.email}
-                    </p>
-                </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="flex-1 bg-black/20 p-4 rounded-xl border border-white/10 text-center">
-                        <div className="text-sm text-[#EEEEEE]/70">Saldo Kredit</div>
-                        <div className="text-2xl font-bold text-[#00ADB5]">{user?.institution?.issuanceCredits ?? 0}</div>
+            <header className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-3xl shadow-2xl p-6 sm:p-8 mb-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                            {getGreeting()}, {user?.institution?.name.split(' ')[0] ?? user?.email}
+                        </h1>
+                        <p className="text-lg text-[#EEEEEE]/70 mt-1">
+                            Selamat datang di dasbor penerbit Anda.
+                        </p>
                     </div>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center space-x-2 px-4 py-2 bg-red-600/50 hover:bg-red-600/80 border border-red-500/50 text-white rounded-xl font-semibold transition-colors h-full"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <span className="hidden sm:inline">Keluar</span>
-                    </button>
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 rounded-xl font-semibold transition-all duration-300"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            <span>Keluar</span>
+                        </button>
+                    </div>
+                </div>
+                <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-white">
+                    <div className="bg-black/20 p-4 rounded-xl border border-white/10 flex items-center gap-4">
+                        <div className="p-3 bg-[#00ADB5]/20 rounded-lg"><User className="w-5 h-5 text-[#00ADB5]"/></div>
+                        <div>
+                            <div className="text-sm text-[#EEEEEE]/70">Institusi</div>
+                            <div className="text-md font-semibold truncate">{user?.institution?.name}</div>
+                        </div>
+                    </div>
+                    <div className="bg-black/20 p-4 rounded-xl border border-white/10 flex items-center gap-4">
+                        <div className="p-3 bg-[#00ADB5]/20 rounded-lg"><CreditCard className="w-5 h-5 text-[#00ADB5]"/></div>
+                        <div>
+                            <div className="text-sm text-[#EEEEEE]/70">Saldo Kredit</div>
+                            <div className="text-md font-bold">{user?.institution?.issuanceCredits ?? 0}</div>
+                        </div>
+                    </div>
+                     <div className="bg-black/20 p-4 rounded-xl border border-white/10 flex items-center gap-4">
+                        <div className="p-3 bg-[#00ADB5]/20 rounded-lg"><LayoutTemplate className="w-5 h-5 text-[#00ADB5]"/></div>
+                        <div>
+                            <div className="text-sm text-[#EEEEEE]/70">Total Template</div>
+                            <div className="text-md font-bold">{templates.length}</div>
+                        </div>
+                    </div>
+                     <div className="bg-black/20 p-4 rounded-xl border border-white/10 flex items-center gap-4">
+                        <div className="p-3 bg-[#00ADB5]/20 rounded-lg"><History className="w-5 h-5 text-[#00ADB5]"/></div>
+                        <div>
+                            <div className="text-sm text-[#EEEEEE]/70">Total Terbit</div>
+                            <div className="text-md font-bold">{issuanceHistory.length}</div>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -249,20 +262,14 @@ function IssuerDashboard() {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-lg text-sm sm:text-base font-semibold flex items-center justify-center space-x-2 transition-colors ${
+                        className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-lg text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-all duration-300 transform ${
                           activeTab === tab.id
-                            ? 'bg-[#00ADB5] text-white shadow-md shadow-[#00ADB5]/20'
-                            : 'text-[#EEEEEE]/70 hover:bg-white/10'
+                            ? 'bg-[#00ADB5] text-white shadow-lg shadow-[#00ADB5]/25'
+                            : 'text-[#EEEEEE]/70 hover:bg-[#393E46]/50 hover:text-white'
                         }`}
                     >
                         <tab.icon className="w-5 h-5" />
-                        <span>
-                          {
-                            tab.id === 'templates' ? `${tab.label} (${templates.length})` : 
-                            tab.id === 'history' ? `${tab.label} (${issuanceHistory.length})` :
-                            tab.label
-                          }
-                        </span>
+                        <span>{tab.label}</span>
                     </button>
                 ))}
             </div>
@@ -273,110 +280,104 @@ function IssuerDashboard() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.35, ease: "easeInOut" }}
                 >
-                    {activeTab === 'issue' && (
-                      <Section>
-                        <MintCredentialForm templates={templates} showAlert={showAlert} />
-                      </Section>
-                    )}
-                    
-                    {activeTab === 'batch-issue' && (
-                      <Section>
-                        <BatchIssueForm templates={templates} showAlert={showAlert} onBatchComplete={handleBatchComplete} />
-                      </Section>
-                    )}
-
-                    {activeTab === 'history' && (
-                      <Section>
-                        <IssuanceHistory history={issuanceHistory} isLoading={historyLoading} />
-                      </Section>
-                    )}
-                    
-                    {activeTab === 'billing' && user && (
-                        <Section>
-                            <BillingSection user={user} showAlert={showAlert} />
-                        </Section>
-                    )}
-
+                    {activeTab === 'issue' && <MintCredentialForm templates={templates} showAlert={showAlert} />}
+                    {activeTab === 'batch-issue' && <BatchIssueForm templates={templates} showAlert={showAlert} onBatchComplete={handleBatchComplete} />}
+                    {activeTab === 'history' && <IssuanceHistory history={issuanceHistory} isLoading={historyLoading} />}
+                    {activeTab === 'billing' && user && <BillingSection user={user} showAlert={showAlert} />}
                     {activeTab === 'builder' && (
-                        <Section>
-                            <div className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-2xl p-6 sm:p-8">
-                                <div className="h-[80vh]">
-                                    <TemplateBuilder onSave={handleSaveTemplate} isSaving={isSaving} />
-                                </div>
+                        <div className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-2xl p-4 sm:p-6">
+                            <div className="h-[85vh] rounded-lg overflow-hidden">
+                                <TemplateBuilder onSave={handleSaveTemplate} isSaving={isSaving} />
                             </div>
-                        </Section>
+                        </div>
                     )}
-
                     {activeTab === 'templates' && (
-                        <Section>
-                            <div className="mb-8 flex justify-between items-center">
+                        <div>
+                            <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <h2 className="text-3xl font-bold text-white">Manajemen Template</h2>
                                 <button
                                   onClick={() => setActiveTab('builder')}
-                                  className="bg-[#00ADB5] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-[#EEEEEE] px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2"
+                                  className="w-full sm:w-auto bg-gradient-to-r from-[#00ADB5] to-[#009da3] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-white px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
                                 >
                                     <FilePlus className="w-5 h-5"/>
-                                    <span>Buat Baru</span>
+                                    <span>Buat Template Baru</span>
                                 </button>
                             </div>
                             {templates.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {templates.map((template) => (
-                                        <motion.div
-                                            key={template.id}
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-2xl p-6 flex flex-col justify-between"
-                                        >
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white">{template.name}</h3>
-                                                <p className="text-[#EEEEEE]/70 text-sm mt-2 mb-2 min-h-[40px]">
-                                                  {template.description || 'Tidak ada deskripsi.'}
-                                                </p>
-                                                <p className="text-xs text-[#EEEEEE]/50">
-                                                  Fields: {template.dynamicFields?.length || 0}
-                                                </p>
-                                            </div>
-                                            <div className="flex space-x-3 mt-auto">
-                                                <button
-                                                  disabled
-                                                  className="flex-1 text-sm font-medium py-2 px-3 border border-[#EEEEEE]/30 rounded-lg text-[#EEEEEE]/50 cursor-not-allowed flex items-center justify-center space-x-2"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                    <span>Ubah</span>
-                                                </button>
-                                                <button
-                                                  onClick={() => handleDeleteTemplate(template.id)}
-                                                  className="flex-1 text-red-400 text-sm font-medium py-2 px-3 border border-red-500/50 hover:bg-red-500/20 rounded-lg transition-colors flex items-center justify-center space-x-2"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                    <span>Hapus</span>
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    ))}
+                                    <AnimatePresence>
+                                        {templates.map((template) => (
+                                            <motion.div
+                                                key={template.id}
+                                                layout
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.9 }}
+                                                transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-2xl p-6 flex flex-col group"
+                                            >
+                                                <div className="flex-grow">
+                                                    <h3 className="text-xl font-bold text-white group-hover:text-[#00ADB5] transition-colors">{template.name}</h3>
+                                                    <p className="text-[#EEEEEE]/70 text-sm mt-2 mb-4 min-h-[40px] leading-relaxed">
+                                                      {template.description || <span className="italic">Tidak ada deskripsi.</span>}
+                                                    </p>
+                                                    <div className="text-xs text-[#EEEEEE]/50 flex items-center gap-2 border-t border-white/10 pt-3">
+                                                        <Settings className="w-3.5 h-3.5"/>
+                                                        <span>{template.dynamicFields?.length || 0} Kolom Dinamis</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
+                                                    <button
+                                                      disabled
+                                                      className="flex-1 text-sm font-medium py-2 px-3 border border-[#EEEEEE]/20 rounded-lg text-[#EEEEEE]/50 cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                                                    >
+                                                        <Edit className="w-4 h-4" />
+                                                        <span>Ubah</span>
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleDeleteTemplate(template.id)}
+                                                      className="flex-1 text-red-400 text-sm font-medium py-2 px-3 border border-red-500/40 hover:bg-red-500/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                        <span>Hapus</span>
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
                                 </div>
                             ) : (
-                                <div className="text-center py-16 bg-black/20 rounded-2xl border border-white/10">
-                                    <h3 className="text-2xl font-semibold text-white">Belum ada template.</h3>
-                                    <p className="text-[#EEEEEE]/60 mt-2 mb-6">Mari mulai dengan membuat template kredensial pertama Anda.</p>
+                                <div className="text-center py-20 bg-black/20 rounded-2xl border border-dashed border-white/10">
+                                    <LayoutTemplate className="w-16 h-16 text-[#EEEEEE]/30 mx-auto mb-4"/>
+                                    <h3 className="text-2xl font-semibold text-white">Belum Ada Template</h3>
+                                    <p className="text-[#EEEEEE]/60 mt-2 mb-6 max-w-md mx-auto">Anda belum membuat template apapun. Mulai dengan mendesain template kredensial pertama Anda.</p>
                                     <button
                                       onClick={() => setActiveTab('builder')}
-                                      className="bg-[#00ADB5] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-[#EEEEEE] px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105"
+                                      className="bg-[#00ADB5] hover:shadow-lg hover:shadow-[#00ADB5]/40 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105"
                                     >
                                         Buat Template Pertama
                                     </button>
                                 </div>
                             )}
-                        </Section>
+                        </div>
                     )}
                 </motion.div>
             </AnimatePresence>
         </main>
     </div>
   );
+}
+
+export default function IssuerDashboardPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center text-white">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 border-[#00ADB5]"></div>
+            </div>
+        }>
+            <IssuerDashboardPageContent />
+        </Suspense>
+    )
 }

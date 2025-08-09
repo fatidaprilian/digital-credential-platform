@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.7",
     "@types/papaparse": "^5.3.16",
     "@types/react-dnd": "^2.0.36",
     "@web3auth/base": "^9.7.0",

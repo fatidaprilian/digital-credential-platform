@@ -3,11 +3,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstitutionStatus, Prisma } from '@prisma/client';
 import { RejectInstitutionDto } from './dto/reject-institution.dto';
-import { EmailService } from '../email/email.service'; // <-- 1. Impor EmailService
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
-  // --- 2. Inject EmailService di constructor ---
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
@@ -59,6 +58,7 @@ export class AdminService {
         officialEmail: true,
         status: true,
         issuanceCredits: true,
+        verificationDocumentUrl: true, // <-- Ditambahkan untuk konsistensi
         adminUser: { select: { email: true, createdAt: true } },
       },
       orderBy: { name: 'asc' },
@@ -77,6 +77,7 @@ export class AdminService {
         officialEmail: true,
         status: true,
         issuanceCredits: true,
+        verificationDocumentUrl: true, // <-- REVISI: Tambahkan field ini
         adminUser: { select: { email: true, createdAt: true } },
       },
       orderBy: { adminUser: { createdAt: 'asc' } },
@@ -84,10 +85,28 @@ export class AdminService {
   }
 
   /**
+   * REVISI: Metode baru untuk mendapatkan path dokumen verifikasi.
+   * @param id ID Institusi
+   * @returns path file dari dokumen
+   */
+  async getVerificationDocumentPath(id: number): Promise<string> {
+    const institution = await this.prisma.institution.findUnique({
+      where: { id },
+      select: { verificationDocumentUrl: true },
+    });
+
+    if (!institution || !institution.verificationDocumentUrl) {
+      throw new NotFoundException(
+        `Dokumen verifikasi untuk institusi dengan ID ${id} tidak ditemukan.`,
+      );
+    }
+    return institution.verificationDocumentUrl;
+  }
+
+  /**
    * Menyetujui pendaftaran institusi dan mengirim email notifikasi.
    */
   async approveInstitution(id: number) {
-    // Ambil data institusi terlebih dahulu untuk mendapatkan email dan nama
     const institutionToApprove = await this.prisma.institution.findUnique({
       where: { id },
     });
@@ -96,7 +115,6 @@ export class AdminService {
       throw new NotFoundException(`Institusi dengan ID ${id} tidak ditemukan.`);
     }
 
-    // Update status institusi di database
     const updatedInstitution = await this.prisma.institution.update({
       where: { id },
       data: {
@@ -107,7 +125,6 @@ export class AdminService {
       },
     });
 
-    // --- 3. Panggil metode pengiriman email SETELAH berhasil update ---
     await this.emailService.sendApprovalEmail(
       updatedInstitution.officialEmail,
       updatedInstitution.name,
@@ -121,7 +138,6 @@ export class AdminService {
    */
   async rejectInstitution(id: number, dto: RejectInstitutionDto) {
     await this.prisma.institution.findUniqueOrThrow({ where: { id } });
-    // TODO: Di masa depan, Anda bisa menambahkan notifikasi email penolakan di sini
     return this.prisma.institution.update({
       where: { id },
       data: {

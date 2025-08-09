@@ -92,11 +92,16 @@ export const Navbar = () => {
         }`}
       >
         <div className="flex justify-between items-center px-6 py-2">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavigation('/')}>
-            <div className="bg-gradient-to-r from-[#00ADB5] to-[#393E46] p-3 rounded-md shadow-md">
-              <Shield className="w-6 h-6 text-[#EEEEEE]" />
-            </div>
-            <span className="text-xl font-bold text-[#EEEEEE]">VERITASID</span>
+        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavigation('/')}>
+          {/* Hapus div background */}
+          <Image
+            src="/veritasidtrans.svg"
+            alt="Logo VeritasID"
+            width={100}
+            height={100}
+            className="w-12 h-12" // sesuaikan ukuran sesuai kebutuhan
+          />
+          <span className="text-xl font-bold text-[#EEEEEE]">VERITASID</span>
           </div>
 
           <div className="hidden md:flex items-center space-x-8">
