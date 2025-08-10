@@ -31,8 +31,7 @@ import {
     Send,
     ArrowLeft,
     Copy,
-    Hash,
-    Loader2 // Added for revoke loading state
+    Hash
 } from 'lucide-react';
 
 // Import components
@@ -52,10 +51,9 @@ const TemplateBuilder = dynamic(() => import('@/components/TemplateBuilder'), {
 });
 
 // ==================================
-// NEW & REVISED COMPONENTS
+// SUB-COMPONENTS
 // ==================================
 
-// 1. Dashboard Header
 const DashboardHeader = ({ user, onLogout }: { user: UserProfile | null; onLogout: () => void; }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -132,7 +130,6 @@ const DashboardHeader = ({ user, onLogout }: { user: UserProfile | null; onLogou
   );
 };
 
-// 2. Stats Card
 const StatsCard = ({ icon: Icon, title, value, color = '#00ADB5' }: { icon: any; title: string; value: string | number; color?: string; }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -154,61 +151,54 @@ const StatsCard = ({ icon: Icon, title, value, color = '#00ADB5' }: { icon: any;
   </motion.div>
 );
 
-// 3. Quick Actions
 const QuickActions = ({ onActionClick }: { onActionClick: (action: string) => void }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
     {[
-        { id: 'issue', title: 'Terbitkan Satuan', desc: 'Buat satu kredensial', icon: Send, primary: true },
-        { id: 'batch-issue', title: 'Terbitkan Batch', desc: 'Unggah file CSV', icon: FileSpreadsheet },
-        { id: 'builder', title: 'Desain Template', desc: 'Buat template baru', icon: FilePlus },
-        { id: 'billing', title: 'Billing & Kredit', desc: 'Kelola pembayaran', icon: CreditCard }
+      { id: 'issue', title: 'Terbitkan Satuan', desc: 'Buat satu kredensial', icon: Send, primary: true },
+      { id: 'batch-issue', title: 'Terbitkan Batch', desc: 'Unggah file CSV', icon: FileSpreadsheet },
+      { id: 'builder', title: 'Desain Template', desc: 'Buat template baru', icon: FilePlus },
+      { id: 'billing', title: 'Billing & Kredit', desc: 'Kelola pembayaran', icon: CreditCard }
     ].map(action => (
-        <motion.button
-            key={action.id}
-            onClick={() => onActionClick(action.id)}
-            whileHover={{ y: -5, scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-            className={`${action.primary 
-                ? 'bg-gradient-to-r from-[#00ADB5] to-[#009da3] text-white hover:shadow-lg hover:shadow-[#00ADB5]/30' 
-                : 'bg-[#222831]/60 backdrop-blur-lg border border-[#EEEEEE]/10 text-white hover:border-[#00ADB5]/30'
-            } p-6 rounded-2xl flex items-center gap-4 transition-all text-left`}
-        >
-            <div className={`p-3 rounded-lg ${action.primary ? 'bg-white/20' : 'bg-[#00ADB5]/20'}`}>
-                <action.icon className={`w-6 h-6 ${action.primary ? 'text-white' : 'text-[#00ADB5]'}`} />
-            </div>
-            <div>
-                <p className="font-semibold">{action.title}</p>
-                <p className={`text-sm ${action.primary ? 'opacity-90' : 'text-[#EEEEEE]/60'}`}>{action.desc}</p>
-            </div>
-        </motion.button>
+      <motion.button
+        key={action.id}
+        onClick={() => onActionClick(action.id)}
+        whileHover={{ y: -5, scale: 1.03 }}
+        whileTap={{ scale: 0.98 }}
+        className={`${action.primary 
+          ? 'bg-gradient-to-r from-[#00ADB5] to-[#009da3] text-white hover:shadow-lg hover:shadow-[#00ADB5]/30' 
+          : 'bg-[#222831]/60 backdrop-blur-lg border border-[#EEEEEE]/10 text-white hover:border-[#00ADB5]/30'
+        } p-6 rounded-2xl flex items-center gap-4 transition-all text-left`}
+      >
+        <div className={`p-3 rounded-lg ${action.primary ? 'bg-white/20' : 'bg-[#00ADB5]/20'}`}>
+          <action.icon className={`w-6 h-6 ${action.primary ? 'text-white' : 'text-[#00ADB5]'}`} />
+        </div>
+        <div>
+          <p className="font-semibold">{action.title}</p>
+          <p className={`text-sm ${action.primary ? 'opacity-90' : 'text-[#EEEEEE]/60'}`}>{action.desc}</p>
+        </div>
+      </motion.button>
     ))}
   </div>
 );
 
-// 4. Enhanced Issuance History Table
-const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: { 
-    history: IssuanceLog[];
-    showAlert: (msg: string, type: 'success' | 'error') => void;
-    onRevokeSuccess: () => void;
-}) => {
+const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  const [revokingId, setRevokingId] = useState<number | null>(null);
 
   const handleCopy = (text: string, id: number) => {
-      navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const filteredHistory = history.filter(log => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-        log.template.name.toLowerCase().includes(searchLower) ||
-        log.recipientAddress.toLowerCase().includes(searchLower) ||
-        log.publicId.toLowerCase().includes(searchLower) ||
-        (log.credentialId && log.credentialId.toString().includes(searchLower));
+      log.template.name.toLowerCase().includes(searchLower) ||
+      log.recipientAddress.toLowerCase().includes(searchLower) ||
+      log.publicId.toLowerCase().includes(searchLower) ||
+      log.credentialId.toString().includes(searchLower);
 
     const matchesFilter = filterStatus === 'all' || log.status.toLowerCase() === filterStatus;
     return matchesSearch && matchesFilter;
@@ -222,42 +212,9 @@ const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: {
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-green-300 bg-green-500/20"><CheckCircle className="w-3.5 h-3.5" /> Diterbitkan</span>;
       case 'pending':
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-yellow-300 bg-yellow-500/20"><Clock className="w-3.5 h-3.5" /> Pending</span>;
-      case 'revoked':
-        return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-gray-300 bg-gray-500/20"><XCircle className="w-3.5 h-3.5" /> Dicabut</span>;
       default:
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-red-300 bg-red-500/20"><XCircle className="w-3.5 h-3.5" /> Gagal</span>;
     }
-  };
-  
-  const handleRevoke = async (log: IssuanceLog) => {
-      if (!confirm(`Apakah Anda yakin ingin mencabut kredensial untuk ${log.recipientAddress}? Aksi ini tidak dapat dibatalkan.`)) {
-          return;
-      }
-      
-      setRevokingId(log.id);
-      
-      try {
-          const token = localStorage.getItem('access_token');
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-          
-          const response = await fetch(`${apiUrl}/credentials/revoke/${log.publicId}`, {
-              method: 'PATCH',
-              headers: { 'Authorization': `Bearer ${token}` }
-          });
-          
-          const result = await response.json();
-          if (!response.ok) {
-              throw new Error(result.message || 'Gagal mencabut kredensial.');
-          }
-          
-          showAlert('Kredensial berhasil dicabut!', 'success');
-          onRevokeSuccess();
-          
-      } catch (err: any) {
-          showAlert(err.message, 'error');
-      } finally {
-          setRevokingId(null);
-      }
   };
   
   return (
@@ -283,7 +240,6 @@ const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: {
                 <option value="all">Semua Status</option>
                 <option value="confirmed">Diterbitkan</option>
                 <option value="pending">Pending</option>
-                <option value="revoked">Dicabut</option>
               </select>
             </div>
           </div>
@@ -311,12 +267,12 @@ const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: {
                 className="border-b border-[#EEEEEE]/5 hover:bg-[#393E46]/20 transition-colors"
               >
                 <td className="py-4 px-6 text-sm text-white font-mono">
-                    <div className="flex items-center gap-2">
-                        <span>{log.publicId.substring(0, 8)}...</span>
-                        <button onClick={() => handleCopy(log.publicId, log.id)} className="text-[#00ADB5] hover:text-white transition-colors">
-                            {copiedId === log.id ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span>{log.publicId.substring(0, 8)}...</span>
+                    <button onClick={() => handleCopy(log.publicId, log.id)} className="text-[#00ADB5] hover:text-white transition-colors">
+                      {copiedId === log.id ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </td>
                 <td className="py-4 px-6 text-sm text-[#EEEEEE]/70 font-mono">#{log.credentialId}</td>
                 <td className="py-4 px-6 font-medium text-white">{log.template.name}</td>
@@ -324,22 +280,10 @@ const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: {
                 <td className="py-4 px-6 text-sm text-[#EEEEEE]/70">{new Date(log.issuedAt).toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}</td>
                 <td className="py-4 px-6">{getStatusChip(log.status)}</td>
                 <td className="py-4 px-6">
-                  <div className="flex items-center gap-2">
-                    <a href={`https://www.oklink.com/amoy/tx/${log.transactionHash}`} target="_blank" rel="noopener noreferrer"
-                        className="p-2 inline-block text-[#EEEEEE]/60 hover:text-[#00ADB5] hover:bg-[#00ADB5]/10 rounded-lg transition-all" title="Lihat di Explorer">
-                      <Eye className="w-4 h-4" />
-                    </a>
-                    {log.status.toLowerCase() === 'confirmed' && (
-                        <button 
-                            onClick={() => handleRevoke(log)} 
-                            disabled={revokingId === log.id}
-                            className="p-2 inline-block text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait" 
-                            title="Cabut Kredensial"
-                        >
-                            {revokingId === log.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                        </button>
-                    )}
-                  </div>
+                  <a href={`https://www.oklink.com/amoy/tx/${log.transactionHash}`} target="_blank" rel="noopener noreferrer"
+                    className="p-2 inline-block text-[#EEEEEE]/60 hover:text-[#00ADB5] hover:bg-[#00ADB5]/10 rounded-lg transition-all" title="Lihat di Explorer">
+                    <Eye className="w-4 h-4" />
+                  </a>
                 </td>
               </motion.tr>
             ))}
@@ -356,16 +300,15 @@ const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: {
   );
 };
 
-// 5. Back Button Component
 const BackButton = ({ onClick }: { onClick: () => void }) => (
-    <motion.button
-        onClick={onClick}
-        className="flex items-center gap-2 text-[#EEEEEE]/70 hover:text-white mb-6 transition-colors"
-        whileHover={{ x: -4 }}
-    >
-        <ArrowLeft className="w-5 h-5" />
-        <span className="font-semibold">Kembali ke Dasbor</span>
-    </motion.button>
+  <motion.button
+    onClick={onClick}
+    className="flex items-center gap-2 text-[#EEEEEE]/70 hover:text-white mb-6 transition-colors"
+    whileHover={{ x: -4 }}
+  >
+    <ArrowLeft className="w-5 h-5" />
+    <span className="font-semibold">Kembali ke Dasbor</span>
+  </motion.button>
 );
 
 // ==================================
@@ -385,8 +328,8 @@ function IssuerDashboard() {
     if (type === 'success') setSuccess(message);
     else setError(message);
     setTimeout(() => {
-        setSuccess(null);
-        setError(null);
+      setSuccess(null);
+      setError(null);
     }, 5000);
   }, []);
   
@@ -397,7 +340,6 @@ function IssuerDashboard() {
       return;
     }
     try {
-      setLoading(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
       const [userResponse, templatesResponse, historyResponse] = await Promise.all([
         fetch(`${apiUrl}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -437,111 +379,116 @@ function IssuerDashboard() {
   };
   
   const pageVariants = {
-      initial: { opacity: 0, x: -50 },
-      in: { opacity: 1, x: 0 },
-      out: { opacity: 0, x: 50 },
+    initial: { opacity: 0, x: -50 },
+    in: { opacity: 1, x: 0 },
+    out: { opacity: 0, x: 50 },
   };
 
   const pageTransition = {
-      type: 'tween',
-      ease: 'anticipate',
-      duration: 0.5,
+    type: 'tween',
+    ease: 'anticipate',
+    duration: 0.5,
   };
 
-
-  if (loading && !user) { // Only show full-page loader on initial load
+  if (loading) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center">
-            <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-12 h-12 border-4 border-[#00ADB5] border-t-transparent rounded-full"
-            />
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-[#00ADB5] border-t-transparent rounded-full"
+        />
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] relative">
-        <FloatingParticles />
-        <AnimatePresence>
-            {error && <Alert message={error} type="error" onClose={() => setError(null)} />}
-            {success && <Alert message={success} type="success" onClose={() => setSuccess(null)} />}
-        </AnimatePresence>
+      <FloatingParticles />
+      <AnimatePresence>
+        {error && <Alert message={error} type="error" onClose={() => setError(null)} />}
+        {success && <Alert message={success} type="success" onClose={() => setSuccess(null)} />}
+      </AnimatePresence>
       
-        <div className="relative z-10">
-            <DashboardHeader user={user} onLogout={handleLogout} />
+      <div className="relative z-10">
+        <DashboardHeader user={user} onLogout={handleLogout} />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <AnimatePresence mode="wait">
-                    {activeView === 'dashboard' && (
-                        <motion.div
-                            key="dashboard"
-                            initial="initial" animate="in" exit="out"
-                            variants={pageVariants} transition={pageTransition}
-                        >
-                            <div className="space-y-10">
-                                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                                    <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">
-                                        Selamat datang, {user?.institution?.name.split(' ')[0]}! 👋
-                                    </h1>
-                                    <p className="text-[#EEEEEE]/70 text-lg">
-                                        Berikut adalah ringkasan aktivitas kredensial Anda.
-                                    </p>
-                                </motion.div>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <AnimatePresence mode="wait">
+            {activeView === 'dashboard' && (
+              <motion.div
+                key="dashboard"
+                initial="initial" animate="in" exit="out"
+                variants={pageVariants} transition={pageTransition}
+              >
+                <div className="space-y-10">
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">
+                      Selamat datang, {user?.institution?.name.split(' ')[0]}! 👋
+                    </h1>
+                    <p className="text-[#EEEEEE]/70 text-lg">
+                      Berikut adalah ringkasan aktivitas kredensial Anda.
+                    </p>
+                  </motion.div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <StatsCard icon={FileText} title="Total Terbit" value={issuanceHistory.length} />
-                                    <StatsCard icon={LayoutTemplate} title="Total Template" value={templates.length} color="#3b82f6" />
-                                    <StatsCard icon={Users} title="Penerima Unik" value={new Set(issuanceHistory.map(h => h.recipientAddress)).size} color="#8b5cf6" />
-                                    <StatsCard icon={CreditCard} title="Sisa Kredit" value={user?.institution?.issuanceCredits ?? 0} color="#10b981" />
-                                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatsCard icon={FileText} title="Total Terbit" value={issuanceHistory.length} />
+                    <StatsCard icon={LayoutTemplate} title="Total Template" value={templates.length} color="#3b82f6" />
+                    <StatsCard icon={Users} title="Penerima Unik" value={new Set(issuanceHistory.map(h => h.recipientAddress)).size} color="#8b5cf6" />
+                    <StatsCard icon={CreditCard} title="Sisa Kredit" value={user?.institution?.issuanceCredits ?? 0} color="#10b981" />
+                  </div>
 
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white mb-6">Aksi Cepat</h2>
-                                    <QuickActions onActionClick={setActiveView} />
-                                </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-6">Aksi Cepat</h2>
+                    <QuickActions onActionClick={setActiveView} />
+                  </div>
 
-                                <IssuanceHistoryTable history={issuanceHistory} showAlert={showAlert} onRevokeSuccess={fetchData} />
-                            </div>
-                        </motion.div>
-                    )}
+                  <IssuanceHistoryTable history={issuanceHistory} />
+                </div>
+              </motion.div>
+            )}
 
-                    {activeView !== 'dashboard' && (
-                         <motion.div
-                            key={activeView}
-                            initial="initial" animate="in" exit="out"
-                            variants={pageVariants} transition={pageTransition}
-                         >
-                            <BackButton onClick={() => setActiveView('dashboard')} />
-                            {activeView === 'issue' && <MintCredentialForm templates={templates} showAlert={showAlert} />}
-                            {activeView === 'batch-issue' && <BatchIssueForm templates={templates} showAlert={showAlert} onBatchComplete={handleActionComplete} />}
-                            {activeView === 'billing' && user && <BillingSection user={user} showAlert={showAlert} />}
-                            {activeView === 'builder' && (
-                                <div className="bg-gradient-to-br from-[#EEEEEE]/10 to-[#EEEEEE]/5 backdrop-blur-sm border border-[#EEEEEE]/20 rounded-2xl p-4 sm:p-6">
-                                    <div className="h-[85vh] rounded-lg overflow-hidden">
-                                        <TemplateBuilder onSave={handleActionComplete} isSaving={false} />
-                                    </div>
-                                </div>
-                            )}
-                         </motion.div>
-                    )}
-                </AnimatePresence>
-            </main>
-        </div>
+            {activeView !== 'dashboard' && (
+              <motion.div
+                key={activeView}
+                initial="initial" animate="in" exit="out"
+                variants={pageVariants} transition={pageTransition}
+              >
+                <BackButton onClick={() => setActiveView('dashboard')} />
+                {activeView === 'issue' && <MintCredentialForm templates={templates} showAlert={showAlert} />}
+                {activeView === 'batch-issue' && <BatchIssueForm templates={templates} showAlert={showAlert} onBatchComplete={handleActionComplete} />}
+                {activeView === 'billing' && user && <BillingSection user={user} showAlert={showAlert} />}
+                
+                {/* ====================================================== */}
+                {/* START OF REVISED BLOCK */}
+                {/* ====================================================== */}
+                {activeView === 'builder' && (
+                  <div className="w-full h-[85vh] rounded-2xl overflow-hidden border border-[#EEEEEE]/10">
+                    <TemplateBuilder onSaveComplete={handleActionComplete} />
+                  </div>
+                )}
+                {/* ====================================================== */}
+                {/* END OF REVISED BLOCK */}
+                {/* ====================================================== */}
+                
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   );
 }
 
 // Suspense wrapper for the main component
 export default function IssuerDashboardPage() {
-    return (
-        <Suspense fallback={
-            <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center text-white">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 border-[#00ADB5]"></div>
-            </div>
-        }>
-            <IssuerDashboard />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center text-white">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 border-[#00ADB5]"></div>
+      </div>
+    }>
+      <IssuerDashboard />
+    </Suspense>
+  )
 }

@@ -5,7 +5,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useDrag, useDrop } from 'react-dnd';
-import { Type, Rss, Image as ImageIcon, Building, PenSquare, QrCode, X, Move, Palette, RotateCcw } from 'lucide-react';
+import { Type, Rss, Image as ImageIcon, Building, PenSquare, QrCode, X, Palette, RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // Import useRouter
+
+// Interfaces and sub-components (DraggableComponent, etc.) remain the same.
+// They are correct based on your initial code.
 
 interface TemplateComponent {
   id: string;
@@ -32,9 +36,9 @@ interface TemplateComponent {
   };
 }
 
+// The onSave prop is replaced with onSaveComplete for redirection or closing a modal
 interface TemplateBuilderProps {
-  onSave: (template: any) => void;
-  isSaving: boolean;
+  onSaveComplete: () => void; 
   existingTemplate?: any;
 }
 
@@ -106,15 +110,13 @@ const DraggableComponent = ({ component, onUpdate, onSelect, isSelected, onDelet
   const renderComponentContent = () => {
     const customStyle = component.style || {};
 
-    // Gaya untuk komponen non-teks (tetap di tengah)
     const placeholderBaseStyle = "w-full h-full flex items-center justify-center text-xs rounded-lg shadow-sm p-2 text-center overflow-hidden";
     const placeholderSelectedBorderStyle = isSelected ? 'border-2 border-[#00ADB5]' : 'border-2 border-dashed border-[#EEEEEE]/30';
     
-    // --- PERBAIKAN UTAMA: GAYA SELEKSI YANG LEBIH JELAS ---
     const textBaseStyle = "w-full h-full text-xs overflow-hidden transition-all duration-150 rounded-md";
     const selectionClasses = isSelected
-        ? 'bg-[#00ADB5]/20 ring-2 ring-[#00ADB5]' // Latar belakang & ring saat dipilih
-        : 'hover:bg-white/10'; // Efek hover untuk menunjukkan interaktivitas
+        ? 'bg-[#00ADB5]/20 ring-2 ring-[#00ADB5]'
+        : 'hover:bg-white/10';
 
     switch (component.type) {
       case 'static-text':
@@ -320,7 +322,7 @@ const ToolboxItem = ({ type, label, icon: Icon, description }: {
   );
 };
 
-export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: TemplateBuilderProps) {
+export default function TemplateBuilder({ onSaveComplete, existingTemplate }: TemplateBuilderProps) {
   const [components, setComponents] = useState<TemplateComponent[]>([]);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string>('');
@@ -329,28 +331,34 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
   const [templateDescription, setTemplateDescription] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
+  
+  // **State untuk mengelola proses penyimpanan**
+  const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter(); // Initialize router
 
-  useEffect(() => {
-    if (existingTemplate) {
-      setTemplateName(existingTemplate.name || '');
-      setTemplateDescription(existingTemplate.description || '');
-      setComponents(existingTemplate.components || []);
-      if (existingTemplate.backgroundImage) {
-        handleBackgroundImageLoad(existingTemplate.backgroundImage);
-      }
-    }
-  }, [existingTemplate]);
+    useEffect(() => {
+        if (existingTemplate) {
+            setTemplateName(existingTemplate.name || '');
+            setTemplateDescription(existingTemplate.description || '');
+
+            // The 'backgroundImage' property now lives on the template object itself
+            if(existingTemplate.backgroundImage) {
+                handleBackgroundImageLoad(existingTemplate.backgroundImage);
+            }
+            if(existingTemplate.canvasWidth && existingTemplate.canvasHeight) {
+                setCanvasDimensions({width: existingTemplate.canvasWidth, height: existingTemplate.canvasHeight});
+            }
+            if (Array.isArray(existingTemplate.components)) {
+                setComponents(existingTemplate.components);
+            }
+        }
+    }, [existingTemplate]);
 
   const handleBackgroundImageLoad = (imageUrl: string) => {
     const img = new Image();
     img.onload = () => {
       setBackgroundImage(imageUrl);
       setCanvasDimensions({ width: img.width, height: img.height });
-
-      if (!existingTemplate?.id) {
-        setComponents([]);
-        setSelectedComponentId(null);
-      }
     };
     img.onerror = () => {
       alert('Gagal memuat gambar latar. Pastikan URL atau file valid.');
@@ -363,11 +371,10 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
   const handleBackgroundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 10 * 1024 * 1024) { // Maks 10MB
         alert('Ukuran file terlalu besar. Maksimal 10MB.');
         return;
       }
-
       const reader = new FileReader();
       reader.onload = (event) => {
         handleBackgroundImageLoad(event.target?.result as string);
@@ -375,7 +382,7 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
       reader.readAsDataURL(file);
     }
   };
-
+    
   const handleDrop = useCallback((item: any, offset: { x: number; y: number }) => {
     if (!canvasDimensions) return;
 
@@ -395,7 +402,7 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
       y: Math.min(Math.max(0, Math.round(offset.y)), maxY),
       width: defaultWidth,
       height: defaultHeight,
-      content: item.type === 'static-text' ? 'Klik untuk edit teks ini' : undefined,
+      content: item.type === 'static-text' ? 'Ubah isi teks melalui properti komponen' : undefined,
       fieldName: isDynamic ? `${item.type.replace('-', '_')}_${Date.now()}` : undefined,
       label: isDynamic ? `${item.type === 'dynamic-field' ? 'Field Teks' : 'Field Gambar'}` : undefined,
       placeholder: isDynamic ? `Masukkan ${item.type === 'dynamic-field' ? 'teks' : 'gambar'}...` : undefined,
@@ -432,50 +439,6 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
     }
   };
 
-  const handleSave = async () => {
-    if (!templateName.trim()) {
-      alert('Nama template wajib diisi.');
-      return;
-    }
-    if (!backgroundImage) {
-      alert('Gambar latar wajib diunggah.');
-      return;
-    }
-
-    try {
-      const templateData = {
-        name: templateName,
-        description: templateDescription,
-        backgroundImage: backgroundImage,
-        components: components.map(c => ({
-          ...c,
-          x: Math.round(c.x),
-          y: Math.round(c.y),
-          width: Math.round(c.width),
-          height: Math.round(c.height)
-        })),
-        dynamicFields: components
-          .filter(c => c.type === 'dynamic-field' || c.type === 'image-placeholder')
-          .map(c => ({
-            name: c.fieldName!,
-            label: c.label!,
-            type: c.type,
-            x: Math.round(c.x),
-            y: Math.round(c.y),
-            width: Math.round(c.width),
-            height: Math.round(c.height),
-            isRequired: c.isRequired
-          })),
-        canvasWidth: canvasDimensions?.width,
-        canvasHeight: canvasDimensions?.height,
-      };
-      await onSave(templateData);
-    } catch (error) {
-      console.error('Gagal menyimpan template:', error);
-      alert('Gagal menyimpan template.');
-    }
-  };
-
   const handleStaticImageUpload = (e: React.ChangeEvent<HTMLInputElement>, componentId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -509,6 +472,90 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
     setEditingText('');
   };
 
+  /**
+   * ===================================================================
+   * FUNGSI SIMPAN TERINTEGRASI
+   * ===================================================================
+   */
+  const handleSave = async () => {
+    if (!templateName.trim() || !backgroundImage || !canvasDimensions) {
+      alert('Nama template dan gambar latar wajib diisi.');
+      return;
+    }
+
+    setIsSaving(true);
+    
+    // 1. Siapkan payload `components`. Ini adalah array bersih dari objek komponen visual.
+    const finalComponentsPayload = components.map(c => ({
+      ...c,
+      x: Math.round(c.x),
+      y: Math.round(c.y),
+      width: Math.round(c.width),
+      height: Math.round(c.height)
+    }));
+    
+    // 2. Siapkan payload `dynamicFields`.
+    const dynamicFieldsPayload = components
+      .filter(c => c.type === 'dynamic-field' || c.type === 'image-placeholder')
+      .map(c => ({
+        name: c.fieldName!,
+        label: c.label!,
+        type: c.type,
+        x: Math.round(c.x),
+        y: Math.round(c.y),
+        width: Math.round(c.width),
+        height: Math.round(c.height),
+        isRequired: c.isRequired
+      }));
+
+    // 3. Buat payload akhir yang cocok dengan CreateDragDropTemplateDto di backend.
+    const payload = {
+      name: templateName,
+      description: templateDescription,
+      backgroundImage: backgroundImage,          // URL gambar latar (Base64)
+      canvasWidth: canvasDimensions.width,       // Lebar kanvas
+      canvasHeight: canvasDimensions.height,     // Tinggi kanvas
+      components: finalComponentsPayload,        // Array komponen visual
+      dynamicFields: dynamicFieldsPayload,       // Array field dinamis
+    };
+    
+    try {
+        // Ganti dengan cara Anda mendapatkan token (misal: dari context, cookie, dll.)
+        const token = localStorage.getItem('access_token'); 
+        if (!token) {
+            alert('Sesi tidak valid. Silakan login kembali.');
+            setIsSaving(false);
+            return;
+        }
+
+        // Ganti dengan URL API Anda dari environment variables
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+        
+        const response = await fetch(`${apiUrl}/template-builder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Sertakan token autentikasi
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            // Backend mungkin mengembalikan array pesan error
+            const errorMessage = errorData.message ? (Array.isArray(errorData.message) ? errorData.message.join(', ') : errorData.message) : 'Gagal menyimpan template.';
+            throw new Error(errorMessage);
+        }
+        onSaveComplete(); // Panggil callback setelah berhasil
+
+    } catch (error: any) {
+      console.error('Gagal menyimpan template:', error);
+      alert(`Terjadi kesalahan: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   const selectedComp = components.find(c => c.id === selectedComponentId);
   const inputStyle = "w-full px-3 py-2 bg-[#222831]/60 border border-[#EEEEEE]/20 rounded-md text-sm text-[#EEEEEE] focus:ring-2 focus:ring-[#00ADB5] focus:border-transparent transition";
   const labelStyle = "block text-sm font-medium mb-1 text-[#EEEEEE]/80";
@@ -522,9 +569,11 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
     { type: 'qr-code', label: 'Kode QR', icon: QrCode, description: 'QR verifikasi dibuat otomatis' },
   ];
 
+  // Sisa dari JSX tidak berubah
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex w-full h-full bg-[#222831] text-[#EEEEEE] font-sans">
+        {/* Panel Kiri (Toolbox & Properties) */}
         <div className="w-96 bg-transparent p-6 overflow-y-auto space-y-6 border-r border-[#EEEEEE]/10 shrink-0">
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold text-white">Desain Template</h3>
@@ -724,7 +773,7 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
             </div>
           )}
         </div>
-
+        {/* Panel Kanan (Canvas) */}
         <div className="flex-1 p-6 flex flex-col items-center justify-start overflow-auto bg-[#393E46]/20">
           <div className="mb-4 w-full flex justify-between items-center sticky top-0 bg-[#222831] py-2 z-30 border-b border-[#EEEEEE]/10">
             <div>
@@ -777,7 +826,7 @@ export default function TemplateBuilder({ onSave, isSaving, existingTemplate }: 
             )}
           </div>
         </div>
-
+        {/* Modal Editing Teks */}
         {isEditing && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-[#222831] p-6 rounded-lg w-96 space-y-4 border border-[#EEEEEE]/20">
