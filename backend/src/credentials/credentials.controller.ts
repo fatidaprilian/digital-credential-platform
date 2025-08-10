@@ -1,6 +1,6 @@
 // Path: backend/src/credentials/credentials.controller.ts
 
-import { Controller, Post, Body, ValidationPipe, UseGuards, Req, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, ValidationPipe, UseGuards, Req, Get, Param, NotFoundException, Patch } from '@nestjs/common';
 import { CredentialsService } from './credentials.service';
 import { MintCredentialDto } from './dto/mint-credential.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -81,6 +81,23 @@ export class CredentialsController {
     return {
       message: 'Credential issued successfully!',
       transactionHash: txHash,
+    };
+  }
+  
+  /**
+   * BARU: Endpoint untuk mencabut kredensial.
+   */
+  @Patch('revoke/:publicId')
+  @UseGuards(AuthGuard('jwt'))
+  async revokeCredential(
+    @Param('publicId') publicId: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as User;
+    const result = await this.credentialsService.revoke(publicId, user);
+    return {
+      message: 'Kredensial berhasil dicabut!',
+      ...result,
     };
   }
 

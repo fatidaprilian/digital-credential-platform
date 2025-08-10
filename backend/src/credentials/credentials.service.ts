@@ -6,6 +6,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { MintCredentialDto } from './dto/mint-credential.dto';
@@ -43,7 +44,6 @@ export class CredentialsService {
     private readonly ipfsService: IpfsService,
   ) {}
 
-  // --- FUNGSI BARU DITAMBAHKAN DI SINI ---
   /**
    * Mengambil detail (termasuk publicId) untuk sekumpulan tokenId.
    * Digunakan oleh halaman galeri holder.
@@ -102,9 +102,80 @@ export class CredentialsService {
       onChainTokenId: log.credentialId.toString(),
     };
   }
+  
+  /**
+   * BARU: Mencabut kredensial.
+   * Credential akan ditandai sebagai 'REVOKED' di database dan di smart contract.
+   */
+  async revoke(publicId: string, user: User): Promise<{ transactionHash: string }> {
+    if (!user.institutionId) {
+      throw new ForbiddenException('User tidak terhubung dengan institusi manapun.');
+    }
 
-  // ... (Sisa fungsi issue, issueBatch, mint, dll. tidak ada perubahan)
-  // [PASTIKAN ANDA MENYALIN FUNGSI BARU DI ATAS DAN MEMBIARKAN FUNGSI LAINNYA TETAP ADA]
+    const log = await this.prisma.issuanceLog.findUnique({
+      where: { publicId },
+      include: { template: true },
+    });
+
+    if (!log) {
+      throw new NotFoundException(`Kredensial dengan ID ${publicId} tidak ditemukan.`);
+    }
+
+    if (log.template.institutionId !== user.institutionId) {
+      throw new ForbiddenException('Anda tidak memiliki izin untuk mencabut kredensial ini.');
+    }
+    
+    if (log.status === 'REVOKED') {
+        throw new BadRequestException('Kredensial ini sudah dicabut.');
+    }
+
+    const onChainTokenId = log.credentialId;
+    if (onChainTokenId === null || onChainTokenId === undefined) {
+        throw new BadRequestException('Kredensial ini tidak memiliki ID on-chain yang valid.');
+    }
+
+    this.logger.log(`Memulai proses pencabutan untuk on-chain ID: ${onChainTokenId}...`);
+
+    let tx;
+    try {
+      // Panggil fungsi 'revoke' di smart contract
+      tx = await this.blockchainService.contract.revoke(onChainTokenId);
+      this.logger.log(`Transaksi pencabutan dikirim. Hash: ${tx.hash}. Menunggu konfirmasi...`);
+      
+      const receipt = await tx.wait();
+      
+      // Verifikasi event 'CredentialRevoked'
+      const revokedEvent = receipt.logs.some(log => {
+          try {
+              const parsedLog = this.blockchainService.contract.interface.parseLog(log);
+              return parsedLog?.name === 'CredentialRevoked';
+          } catch (e) {
+              return false;
+          }
+      });
+      
+      if (!revokedEvent) {
+          throw new InternalServerErrorException("Gagal menemukan event 'CredentialRevoked' setelah transaksi.");
+      }
+
+      this.logger.log(`Kredensial dengan on-chain ID ${onChainTokenId} berhasil dicabut di blockchain.`);
+
+      // Update status di database
+      await this.prisma.issuanceLog.update({
+        where: { id: log.id },
+        data: { status: 'REVOKED' },
+      });
+
+      this.logger.log(`Status untuk kredensial ${publicId} berhasil diubah menjadi REVOKED di database.`);
+
+      return { transactionHash: tx.hash };
+
+    } catch (error) {
+      this.logger.error(`Gagal mencabut kredensial ${publicId}:`, error);
+      throw new InternalServerErrorException(`Gagal mengeksekusi pencabutan: ${error.message}`);
+    }
+  }
+
   async issueBatch(issueBatchDto: IssueCredentialBatchDto, user: User): Promise<{ txHash: string; count: number }> {
     const { batch } = issueBatchDto;
     const batchSize = batch.length;

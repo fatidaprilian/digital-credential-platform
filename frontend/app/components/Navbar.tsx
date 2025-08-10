@@ -444,13 +444,6 @@ export const Navbar = () => {
                     {/* Menu Items */}
                     <div className="p-2">
                       <motion.button 
-                        onClick={() => handleNavigation('/dashboard/holder')} 
-                        className="w-full text-left flex items-center px-3 py-2.5 text-sm text-[#EEEEEE] hover:bg-[#393E46]/50 rounded-lg transition-colors"
-                        whileHover={{ x: 4 }}
-                      >
-                        <LayoutDashboard className="w-4 h-4 mr-3" /> Dasbor
-                      </motion.button>
-                      <motion.button 
                         onClick={() => handleNavigation('/holder/profile')} 
                         className="w-full text-left flex items-center px-3 py-2.5 text-sm text-[#EEEEEE] hover:bg-[#393E46]/50 rounded-lg transition-colors"
                         whileHover={{ x: 4 }}
@@ -615,13 +608,6 @@ export const Navbar = () => {
             
             {/* Menu Items Mobile */}
             <div className="border-t border-[#EEEEEE]/10">
-              <motion.button 
-                onClick={() => handleNavigation('/dashboard/holder')} 
-                className="w-full flex items-center px-4 py-3 text-sm text-[#EEEEEE] hover:bg-[#393E46]/50 transition-colors text-left"
-                whileHover={{ x: 4 }}
-              >
-                <LayoutDashboard className="w-4 h-4 mr-3" /> Dasbor
-              </motion.button>
               <motion.button 
                 onClick={() => handleNavigation('/holder/profile')} 
                 className="w-full flex items-center px-4 py-3 text-sm text-[#EEEEEE] hover:bg-[#393E46]/50 transition-colors text-left"

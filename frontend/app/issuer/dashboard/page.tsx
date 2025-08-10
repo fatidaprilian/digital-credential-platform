@@ -30,8 +30,9 @@ import {
     Download,
     Send,
     ArrowLeft,
-    Copy, // <-- Import Ikon
-    Hash  // <-- Import Ikon
+    Copy,
+    Hash,
+    Loader2 // Added for revoke loading state
 } from 'lucide-react';
 
 // Import components
@@ -184,13 +185,16 @@ const QuickActions = ({ onActionClick }: { onActionClick: (action: string) => vo
   </div>
 );
 
-
-// --- REVISI UTAMA DI SINI ---
 // 4. Enhanced Issuance History Table
-const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
+const IssuanceHistoryTable = ({ history, showAlert, onRevokeSuccess }: { 
+    history: IssuanceLog[];
+    showAlert: (msg: string, type: 'success' | 'error') => void;
+    onRevokeSuccess: () => void;
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
 
   const handleCopy = (text: string, id: number) => {
       navigator.clipboard.writeText(text);
@@ -204,7 +208,7 @@ const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
         log.template.name.toLowerCase().includes(searchLower) ||
         log.recipientAddress.toLowerCase().includes(searchLower) ||
         log.publicId.toLowerCase().includes(searchLower) ||
-        log.credentialId.toString().includes(searchLower);
+        (log.credentialId && log.credentialId.toString().includes(searchLower));
 
     const matchesFilter = filterStatus === 'all' || log.status.toLowerCase() === filterStatus;
     return matchesSearch && matchesFilter;
@@ -218,9 +222,42 @@ const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-green-300 bg-green-500/20"><CheckCircle className="w-3.5 h-3.5" /> Diterbitkan</span>;
       case 'pending':
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-yellow-300 bg-yellow-500/20"><Clock className="w-3.5 h-3.5" /> Pending</span>;
+      case 'revoked':
+        return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-gray-300 bg-gray-500/20"><XCircle className="w-3.5 h-3.5" /> Dicabut</span>;
       default:
         return <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-red-300 bg-red-500/20"><XCircle className="w-3.5 h-3.5" /> Gagal</span>;
     }
+  };
+  
+  const handleRevoke = async (log: IssuanceLog) => {
+      if (!confirm(`Apakah Anda yakin ingin mencabut kredensial untuk ${log.recipientAddress}? Aksi ini tidak dapat dibatalkan.`)) {
+          return;
+      }
+      
+      setRevokingId(log.id);
+      
+      try {
+          const token = localStorage.getItem('access_token');
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+          
+          const response = await fetch(`${apiUrl}/credentials/revoke/${log.publicId}`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          const result = await response.json();
+          if (!response.ok) {
+              throw new Error(result.message || 'Gagal mencabut kredensial.');
+          }
+          
+          showAlert('Kredensial berhasil dicabut!', 'success');
+          onRevokeSuccess();
+          
+      } catch (err: any) {
+          showAlert(err.message, 'error');
+      } finally {
+          setRevokingId(null);
+      }
   };
   
   return (
@@ -246,6 +283,7 @@ const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
                 <option value="all">Semua Status</option>
                 <option value="confirmed">Diterbitkan</option>
                 <option value="pending">Pending</option>
+                <option value="revoked">Dicabut</option>
               </select>
             </div>
           </div>
@@ -286,10 +324,22 @@ const IssuanceHistoryTable = ({ history }: { history: IssuanceLog[] }) => {
                 <td className="py-4 px-6 text-sm text-[#EEEEEE]/70">{new Date(log.issuedAt).toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}</td>
                 <td className="py-4 px-6">{getStatusChip(log.status)}</td>
                 <td className="py-4 px-6">
-                  <a href={`https://www.oklink.com/amoy/tx/${log.transactionHash}`} target="_blank" rel="noopener noreferrer"
-                      className="p-2 inline-block text-[#EEEEEE]/60 hover:text-[#00ADB5] hover:bg-[#00ADB5]/10 rounded-lg transition-all" title="Lihat di Explorer">
-                    <Eye className="w-4 h-4" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a href={`https://www.oklink.com/amoy/tx/${log.transactionHash}`} target="_blank" rel="noopener noreferrer"
+                        className="p-2 inline-block text-[#EEEEEE]/60 hover:text-[#00ADB5] hover:bg-[#00ADB5]/10 rounded-lg transition-all" title="Lihat di Explorer">
+                      <Eye className="w-4 h-4" />
+                    </a>
+                    {log.status.toLowerCase() === 'confirmed' && (
+                        <button 
+                            onClick={() => handleRevoke(log)} 
+                            disabled={revokingId === log.id}
+                            className="p-2 inline-block text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait" 
+                            title="Cabut Kredensial"
+                        >
+                            {revokingId === log.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                    )}
+                  </div>
                 </td>
               </motion.tr>
             ))}
@@ -317,7 +367,6 @@ const BackButton = ({ onClick }: { onClick: () => void }) => (
         <span className="font-semibold">Kembali ke Dasbor</span>
     </motion.button>
 );
-
 
 // ==================================
 // MAIN DASHBOARD COMPONENT
@@ -348,6 +397,7 @@ function IssuerDashboard() {
       return;
     }
     try {
+      setLoading(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
       const [userResponse, templatesResponse, historyResponse] = await Promise.all([
         fetch(`${apiUrl}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -399,7 +449,7 @@ function IssuerDashboard() {
   };
 
 
-  if (loading) {
+  if (loading && !user) { // Only show full-page loader on initial load
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#222831] via-[#393E46] to-[#222831] flex items-center justify-center">
             <motion.div
@@ -452,7 +502,7 @@ function IssuerDashboard() {
                                     <QuickActions onActionClick={setActiveView} />
                                 </div>
 
-                                <IssuanceHistoryTable history={issuanceHistory} />
+                                <IssuanceHistoryTable history={issuanceHistory} showAlert={showAlert} onRevokeSuccess={fetchData} />
                             </div>
                         </motion.div>
                     )}
